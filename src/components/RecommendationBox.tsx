@@ -1,8 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import { OmiePrice } from '@/lib/omie'
-import { TariffSettings, calcPrice, getPeriodForHour, findOptimalWindow, getPeriodLabel } from '@/lib/tariff'
-import { Zap, TrendingDown, AlertTriangle, Clock } from 'lucide-react'
+import { TariffSettings, calcPrice, getPeriodForHour, findOptimalWindow, getPeriodLabel, TARIFF_OPTION_LABELS } from '@/lib/tariff'
+import { Zap, TrendingDown, AlertTriangle, Clock, Info, X } from 'lucide-react'
 
 interface Props {
   prices: OmiePrice[]
@@ -15,15 +16,22 @@ function fmt(h: number) {
   return `${String(h).padStart(2, '0')}:00`
 }
 
-// Limiares com IVA 23%: excelente <0.14, bom <0.18, moderado <0.22, caro ≥0.22
-// Limiares sem IVA: dividir por 1.23 → <0.114, <0.146, <0.179
-function classify(price: number, hasIva: boolean): 'excelente' | 'bom' | 'normal' | 'caro' {
-  const t = hasIva
-    ? { a: 0.14, b: 0.18, c: 0.22 }
-    : { a: 0.114, b: 0.146, c: 0.179 }
-  if (price < t.a) return 'excelente'
-  if (price < t.b) return 'bom'
-  if (price < t.c) return 'normal'
+// Limiares dinâmicos baseados no tarifário real do utilizador.
+// Referência: OMIE = 10, 50, 100 €/MWh em período Fora de Vazio —
+// valores que representam pico solar baixo, mercado moderado e mercado caro.
+function getThresholds(settings: TariffSettings) {
+  return {
+    excelente: calcPrice(10,  'fora-vazio', settings),
+    bom:       calcPrice(50,  'fora-vazio', settings),
+    normal:    calcPrice(100, 'fora-vazio', settings),
+  }
+}
+
+function classify(price: number, settings: TariffSettings): 'excelente' | 'bom' | 'normal' | 'caro' {
+  const t = getThresholds(settings)
+  if (price <= t.excelente) return 'excelente'
+  if (price <= t.bom)       return 'bom'
+  if (price <= t.normal)    return 'normal'
   return 'caro'
 }
 
@@ -61,6 +69,8 @@ function buildExplanation(
 }
 
 export default function RecommendationBox({ prices, settings, date, label }: Props) {
+  const [showInfo, setShowInfo] = useState(false)
+
   if (!prices.length) return null
 
   const window = findOptimalWindow(
@@ -78,26 +88,74 @@ export default function RecommendationBox({ prices, settings, date, label }: Pro
   const maxPrice = Math.max(...allTotals)
   const avgPrice = allTotals.reduce((s, v) => s + v, 0) / allTotals.length
 
-  const classification = classify(window.avgPrice, settings.iva > 0)
+  const classification = classify(window.avgPrice, settings)
   const explanation = buildExplanation(prices, settings, date, window)
+  const thresholds = getThresholds(settings)
+
+  const ivaLabel = settings.iva > 0
+    ? `c/ IVA ${(settings.iva * 100).toFixed(0)}%`
+    : 's/ IVA'
 
   const styles = {
-    'excelente': { Icon: Zap, color: 'text-green-700 dark:text-green-300', bg: 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800', title: 'Ótimo para carregar!' },
-    'bom': { Icon: TrendingDown, color: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800', title: 'Bom momento para carregar' },
-    'normal': { Icon: Clock, color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800', title: 'Preços moderados' },
-    'caro': { Icon: AlertTriangle, color: 'text-red-700 dark:text-red-300', bg: 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800', title: 'Energia cara' },
+    'excelente': { Icon: Zap,           color: 'text-green-700 dark:text-green-300', bg: 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800',   title: 'Ótimo para carregar!' },
+    'bom':       { Icon: TrendingDown,  color: 'text-blue-700 dark:text-blue-300',   bg: 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800',     title: 'Bom momento para carregar' },
+    'normal':    { Icon: Clock,         color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800', title: 'Preços moderados' },
+    'caro':      { Icon: AlertTriangle, color: 'text-red-700 dark:text-red-300',     bg: 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800',         title: 'Energia cara' },
   }
 
   const { Icon, color, bg, title } = styles[classification]
 
   return (
     <div className={`rounded-2xl border p-4 space-y-3 ${bg}`}>
-      <div className={`flex items-center gap-2 font-semibold ${color}`}>
-        <Icon size={18} />
-        {title}
+      {/* Cabeçalho */}
+      <div className="flex items-center justify-between">
+        <div className={`flex items-center gap-2 font-semibold ${color}`}>
+          <Icon size={18} />
+          {title}
+        </div>
+        <button
+          onClick={() => setShowInfo(v => !v)}
+          aria-label="Ver critérios de classificação"
+          className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-700/50 transition-colors"
+        >
+          {showInfo ? <X size={15} /> : <Info size={15} />}
+        </button>
       </div>
 
-      {/* Janela única */}
+      {/* Painel informativo */}
+      {showInfo && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-3 border border-gray-100 dark:border-gray-700 space-y-2.5">
+          <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Critérios de classificação
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+            Baseados no teu tarifário <strong className="text-gray-700 dark:text-gray-200">{TARIFF_OPTION_LABELS[settings.tariffOption] ?? settings.tariffOption}</strong> com valores TAR ERSE 2026, margem, perdas e <strong className="text-gray-700 dark:text-gray-200">{ivaLabel}</strong>. Os limiares são calculados para OMIE de referência em período Fora de Vazio.
+          </p>
+          <div className="space-y-1.5">
+            {[
+              { label: 'Ótimo para carregar', color: 'text-green-600', threshold: `≤ ${thresholds.excelente.toFixed(4)} €/kWh`, ref: 'OMIE ≤ 10 €/MWh (pico solar baixo)' },
+              { label: 'Bom momento',         color: 'text-blue-600',  threshold: `≤ ${thresholds.bom.toFixed(4)} €/kWh`,       ref: 'OMIE ≤ 50 €/MWh' },
+              { label: 'Preços moderados',    color: 'text-amber-600', threshold: `≤ ${thresholds.normal.toFixed(4)} €/kWh`,     ref: 'OMIE ≤ 100 €/MWh' },
+              { label: 'Energia cara',        color: 'text-red-600',   threshold: `> ${thresholds.normal.toFixed(4)} €/kWh`,     ref: 'OMIE > 100 €/MWh' },
+            ].map((row, i) => (
+              <div key={i} className="flex items-start justify-between gap-2 text-xs">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className={`shrink-0 font-medium ${row.color}`}>{row.label}</span>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="font-mono text-gray-700 dark:text-gray-300">{row.threshold}</span>
+                  <span className="block text-[10px] text-gray-400">{row.ref}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-400 leading-relaxed pt-1 border-t border-gray-100 dark:border-gray-700">
+            Os limiares actualizam-se automaticamente se alterares o tarifário ou o toggle de IVA.
+          </p>
+        </div>
+      )}
+
+      {/* Janela ótima */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-3 flex items-center justify-between border border-gray-100 dark:border-gray-700">
         <div>
           <div className="text-xs text-gray-400 mb-0.5">{label} — melhor período</div>
