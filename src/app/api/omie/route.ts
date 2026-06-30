@@ -15,19 +15,25 @@ export async function GET(req: NextRequest) {
   } catch { /* sem cache */ }
 
   // 2. OMIE
-  const prices = await fetchFromOmie(date, country)
+  const result = await fetchFromOmie(date, country)
 
-  // 3. Guardar cache
-  if (prices.length >= 24) {
+  // 3. Guardar cache se dados reais (não simulados)
+  if (!result.isMock && result.prices.length >= 20) {
     try {
-      await cachePrices(prices.map(p => ({ date, hour: p.hour, price_mwh: p.price })))
+      await cachePrices(result.prices.map(p => ({ date, hour: p.hour, price_mwh: p.price })))
     } catch { /* ok */ }
   }
 
-  return NextResponse.json(prices)
+  return NextResponse.json({ prices: result.prices, isMock: result.isMock, source: result.source })
 }
 
-async function fetchFromOmie(date: string, country: string) {
+interface FetchResult {
+  prices: { hour: number; price: number; date: string }[]
+  isMock: boolean
+  source: string
+}
+
+async function fetchFromOmie(date: string, country: string): Promise<FetchResult> {
   // Ficheiro OMIE: marginalpdbc_YYYYMMDD.1
   // Formato: FECHA;HORA(1-24);PRECIO_ES(€/MWh);PRECIO_PT(€/MWh)
   // Coluna PT = índice 3, ES = índice 2
@@ -44,7 +50,7 @@ async function fetchFromOmie(date: string, country: string) {
     if (res.ok) {
       const text = await res.text()
       const prices = parseOmieFile(text, date, country)
-      if (prices.length >= 20) return prices
+      if (prices.length >= 20) return { prices, isMock: false, source: 'omie-file' }
     }
   } catch { /* fallthrough */ }
 
@@ -58,14 +64,28 @@ async function fetchFromOmie(date: string, country: string) {
     if (res.ok) {
       const data = await res.json()
       const prices = parseOmieApi(data, date)
-      if (prices.length >= 20) return prices
+      if (prices.length >= 20) return { prices, isMock: false, source: 'omie-api' }
     }
   } catch { /* fallthrough */ }
 
-  // Fallback: dados simulados (indica claramente que são estimados)
+  // Verificar se D+1 ainda não foi publicado (antes das 13h30)
+  const now = new Date()
+  const targetDate = new Date(date)
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const isTomorrow = targetDate.toDateString() === tomorrow.toDateString()
+  const hourNow = now.getHours()
+  if (isTomorrow && hourNow < 13) {
+    // D+1 ainda não publicado — retornar vazio (UI trata este caso)
+    console.warn(`OMIE: preços D+1 (${date}) ainda não publicados (${hourNow}h < 13h30)`)
+    void dateFormatted
+    return { prices: [], isMock: false, source: 'not-published-yet' }
+  }
+
+  // Fallback: dados simulados
   console.warn(`OMIE: usando dados simulados para ${date}`)
   void dateFormatted
-  return generateMockPrices(date)
+  return { prices: generateMockPrices(date), isMock: true, source: 'mock' }
 }
 
 function parseOmieFile(text: string, date: string, country: string) {

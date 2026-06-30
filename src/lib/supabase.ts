@@ -2,13 +2,24 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { TariffSettings } from './tariff'
 
 let _client: SupabaseClient | null = null
+let _serverClient: SupabaseClient | null = null
 
+// Cliente browser (anon key)
 export function getClient(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!url || !key) return null
   if (!_client) _client = createClient(url, key)
   return _client
+}
+
+// Cliente servidor (service role key — só em API routes, nunca exposto ao browser)
+export function getServerClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !key) return null
+  if (!_serverClient) _serverClient = createClient(url, key)
+  return _serverClient
 }
 
 export interface OmiePriceRow {
@@ -25,12 +36,13 @@ export async function getCachedPrices(date: string): Promise<OmiePriceRow[] | nu
     .select('date, hour, price_mwh')
     .eq('date', date)
     .order('hour')
-  if (error || !data || data.length < 24) return null
+  if (error || !data || data.length < 20) return null
   return data
 }
 
 export async function cachePrices(prices: OmiePriceRow[]): Promise<void> {
-  const sb = getClient()
+  // Usar service role para escrita (ignora RLS) ou anon key como fallback
+  const sb = getServerClient() ?? getClient()
   if (!sb || !prices.length) return
   await sb.from('omie_prices').upsert(prices, { onConflict: 'date,hour' })
 }

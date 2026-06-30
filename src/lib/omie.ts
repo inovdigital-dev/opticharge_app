@@ -4,10 +4,21 @@ export interface OmiePrice {
   date: string   // YYYY-MM-DD
 }
 
-export async function fetchOmiePrices(date: string): Promise<OmiePrice[]> {
+export interface OmieFetchResult {
+  prices: OmiePrice[]
+  isMock: boolean
+  source: string  // 'omie-file' | 'omie-api' | 'supabase-cache' | 'mock' | 'not-published-yet'
+}
+
+export async function fetchOmiePrices(date: string): Promise<OmieFetchResult> {
   const res = await fetch(`/api/omie?date=${date}`)
   if (!res.ok) throw new Error('Erro ao buscar preços OMIE')
-  return res.json()
+  const data = await res.json()
+  // Compatibilidade: API antiga devolvia array, nova devolve { prices, isMock, source }
+  if (Array.isArray(data)) {
+    return { prices: data, isMock: false, source: 'legacy' }
+  }
+  return data as OmieFetchResult
 }
 
 export function formatDate(date: Date): string {

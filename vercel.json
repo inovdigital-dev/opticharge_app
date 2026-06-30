@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/prefetch",
+      "schedule": "30 13 * * *"
+    }
+  ]
+}
