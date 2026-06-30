@@ -52,9 +52,12 @@ function slotToTime(slot: number): string {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const CustomTooltip = ({ active, payload }: any) => {
+const CustomTooltip = ({ active, payload, settings }: any) => {
   if (!active || !payload?.length) return null
   const d = payload[0]?.payload as DataPoint
+  const overlayLabel = settings?.iva > 0
+    ? `TAR + margem + IVA ${(settings.iva * 100).toFixed(0)}%`
+    : 'TAR + margem'
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 shadow-lg text-xs min-w-[190px]">
       <p className="font-semibold text-gray-800 dark:text-gray-100 mb-1.5">
@@ -74,7 +77,7 @@ const CustomTooltip = ({ active, payload }: any) => {
           <span className="font-bold tabular-nums text-blue-600 dark:text-blue-400">{d.total.toFixed(4)} €/kWh</span>
         </div>
         <div className="flex justify-between gap-4 pt-1 border-t border-gray-100 dark:border-gray-700 text-[10px] text-gray-400">
-          <span>TAR + margem + IVA</span>
+          <span>{overlayLabel}</span>
           <span className="tabular-nums">+{(d.total - d.omieKwh).toFixed(4)} €/kWh</span>
         </div>
       </div>
@@ -199,7 +202,7 @@ export default function PriceChart({ prices, settings, date, isMock }: Props) {
             tick={{ fontSize: 9, fill: '#9ca3af' }}
             width={44}
           />
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip content={(props) => <CustomTooltip {...props} settings={settings} />} />
 
           {/* Fundo verde nos períodos ótimos */}
           {optimalSlotRanges.map((r, i) => (
