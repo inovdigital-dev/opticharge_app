@@ -26,6 +26,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [user, setUser] = useState<{ email?: string | null } | null>(null)
+  const [showIVA, setShowIVA] = useState(true)
 
   const today = getToday()
   const tomorrow = getTomorrow()
@@ -57,6 +58,7 @@ export default function Home() {
   const activeData = activeDay === 'hoje' ? todayData : tomorrowData
   const date = activeDay === 'hoje' ? today : tomorrow
   const dayLabel = activeDay === 'hoje' ? 'Hoje' : 'Amanhã'
+  const effectiveSettings = settings ? (showIVA ? settings : { ...settings, iva: 0 }) : null
 
   const fmtDate = (d: Date) => d.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -100,8 +102,8 @@ export default function Home() {
 
       <main className="max-w-lg mx-auto px-4 py-4 space-y-4 pb-8">
         {/* Widget estado atual (só no tab Hoje) */}
-        {activeDay === 'hoje' && !loading && settings && todayData.prices.length > 0 && (
-          <CurrentStatusWidget prices={todayData.prices} settings={settings} />
+        {activeDay === 'hoje' && !loading && effectiveSettings && todayData.prices.length > 0 && (
+          <CurrentStatusWidget prices={todayData.prices} settings={effectiveSettings} />
         )}
 
         {/* Seletor de dia */}
@@ -149,16 +151,31 @@ export default function Home() {
         {/* Gráfico */}
         {!(activeDay === 'amanha' && tomorrowNotPublished) && (
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-start justify-between mb-3">
               <div>
                 <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Preço da energia</h2>
                 <p className="text-xs text-gray-400 capitalize">{fmtDate(date)}</p>
               </div>
-              {lastUpdated && (
-                <span className="text-xs text-gray-400">
-                  {lastUpdated.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
+              <div className="flex flex-col items-end gap-1.5">
+                {/* Toggle IVA */}
+                <button
+                  onClick={() => setShowIVA(v => !v)}
+                  className="flex items-center gap-1.5 group"
+                  aria-label="Incluir IVA nos preços"
+                >
+                  <span className={`text-[10px] font-medium transition-colors ${showIVA ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}`}>
+                    {showIVA ? 'c/ IVA 23%' : 's/ IVA'}
+                  </span>
+                  <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${showIVA ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${showIVA ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
+                  </div>
+                </button>
+                {lastUpdated && (
+                  <span className="text-xs text-gray-400">
+                    {lastUpdated.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
             </div>
             {loading ? (
               <div className="h-48 flex items-center justify-center">
@@ -167,10 +184,10 @@ export default function Home() {
                   <span className="text-xs">A carregar preços OMIE...</span>
                 </div>
               </div>
-            ) : settings ? (
+            ) : effectiveSettings ? (
               <PriceChart
                 prices={activeData.prices}
-                settings={settings}
+                settings={effectiveSettings}
                 date={date}
                 isMock={activeData.isMock}
               />
@@ -179,8 +196,8 @@ export default function Home() {
         )}
 
         {/* Recomendação */}
-        {!loading && settings && activeData.prices.length > 0 && (
-          <RecommendationBox prices={activeData.prices} settings={settings} date={date} label={dayLabel} />
+        {!loading && effectiveSettings && activeData.prices.length > 0 && (
+          <RecommendationBox prices={activeData.prices} settings={effectiveSettings} date={date} label={dayLabel} />
         )}
 
         {/* Info tarifário */}
