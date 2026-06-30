@@ -147,7 +147,7 @@ export default function PriceChart({ prices, settings, date, isMock }: Props) {
   const q2 = sorted[Math.floor(sorted.length * 0.50)]
   const q3 = sorted[Math.floor(sorted.length * 0.75)]
 
-  const yMax = Math.max(...data.map(d => d.total)) * 1.10
+  const yMax = Math.max(...data.map(d => d.total)) * 1.08
   const hourTicks = Array.from({ length: 13 }, (_, i) => i * 8) // a cada 2h
 
   const isToday = date.toDateString() === new Date().toDateString()
@@ -225,25 +225,25 @@ export default function PriceChart({ prices, settings, date, isMock }: Props) {
             />
           )}
 
-          {/* Barras = custo final ao consumidor (€/kWh), cor por quartil */}
-          <Bar dataKey="total" isAnimationActive={false} maxBarSize={8}>
+          {/* Barras = preço OMIE bruto (€/kWh), coloridas pelo quartil do custo final */}
+          <Bar dataKey="omieKwh" isAnimationActive={false} maxBarSize={8}>
             {data.map((entry, i) => (
               <Cell
                 key={i}
                 fill={getBarColor(entry.total, q1, q2, q3)}
-                fillOpacity={entry.isOptimal ? 1 : 0.72}
+                fillOpacity={entry.isOptimal ? 1 : 0.78}
               />
             ))}
           </Bar>
 
-          {/* Linha cinza = preço OMIE bruto (€/kWh) — referência do mercado */}
+          {/* Linha azul = custo final ao consumidor (OMIE + perdas + margem + TAR + IVA + IESPE) */}
           <Line
             type="monotone"
-            dataKey="omieKwh"
-            stroke="#94a3b8"
-            strokeWidth={1.5}
+            dataKey="total"
+            stroke="#2563eb"
+            strokeWidth={2}
             dot={false}
-            activeDot={false}
+            activeDot={{ r: 3, fill: '#2563eb', strokeWidth: 0 }}
             isAnimationActive={false}
           />
         </ComposedChart>
@@ -276,8 +276,8 @@ export default function PriceChart({ prices, settings, date, isMock }: Props) {
           </span>
         ))}
         <span className="flex items-center gap-1 text-[10px] text-gray-500">
-          <span className="inline-block w-5 border-t border-slate-400" style={{ borderTopWidth: 1.5 }} />
-          OMIE €/kWh
+          <span className="inline-block w-5 border-t-2 border-blue-500" />
+          Custo final €/kWh
         </span>
         {optWindow && (
           <span className="flex items-center gap-1 text-[10px] text-gray-500">
