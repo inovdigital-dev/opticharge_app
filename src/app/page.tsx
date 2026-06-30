@@ -201,11 +201,11 @@ export default function Home() {
               </div>
               <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5">
                 <div className="text-xs text-gray-400 mb-0.5">TAR Vazio</div>
-                <div className="font-medium text-green-600 text-xs">{(settings.tarVazio * 100).toFixed(2)} cênt/kWh</div>
+                <div className="font-medium text-green-600 text-xs">{settings.tarVazio.toFixed(4)} €/kWh</div>
               </div>
               <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5">
                 <div className="text-xs text-gray-400 mb-0.5">TAR Fora Vazio</div>
-                <div className="font-medium text-orange-600 text-xs">{(settings.tarForaVazio * 100).toFixed(2)} cênt/kWh</div>
+                <div className="font-medium text-orange-600 text-xs">{settings.tarForaVazio.toFixed(4)} €/kWh</div>
               </div>
             </div>
           </div>
