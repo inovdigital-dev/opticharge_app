@@ -15,10 +15,15 @@ function fmt(h: number) {
   return `${String(h).padStart(2, '0')}:00`
 }
 
-function classify(price: number): 'muito-barato' | 'barato' | 'normal' | 'caro' {
-  if (price < 0.06) return 'muito-barato'
-  if (price < 0.10) return 'barato'
-  if (price < 0.16) return 'normal'
+// Limiares com IVA 23%: excelente <0.14, bom <0.18, moderado <0.22, caro ≥0.22
+// Limiares sem IVA: dividir por 1.23 → <0.114, <0.146, <0.179
+function classify(price: number, hasIva: boolean): 'excelente' | 'bom' | 'normal' | 'caro' {
+  const t = hasIva
+    ? { a: 0.14, b: 0.18, c: 0.22 }
+    : { a: 0.114, b: 0.146, c: 0.179 }
+  if (price < t.a) return 'excelente'
+  if (price < t.b) return 'bom'
+  if (price < t.c) return 'normal'
   return 'caro'
 }
 
@@ -73,12 +78,12 @@ export default function RecommendationBox({ prices, settings, date, label }: Pro
   const maxPrice = Math.max(...allTotals)
   const avgPrice = allTotals.reduce((s, v) => s + v, 0) / allTotals.length
 
-  const classification = classify(window.avgPrice)
+  const classification = classify(window.avgPrice, settings.iva > 0)
   const explanation = buildExplanation(prices, settings, date, window)
 
   const styles = {
-    'muito-barato': { Icon: Zap, color: 'text-green-700 dark:text-green-300', bg: 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800', title: 'Energia muito barata!' },
-    'barato': { Icon: TrendingDown, color: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800', title: 'Bom momento para carregar' },
+    'excelente': { Icon: Zap, color: 'text-green-700 dark:text-green-300', bg: 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800', title: 'Ótimo para carregar!' },
+    'bom': { Icon: TrendingDown, color: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800', title: 'Bom momento para carregar' },
     'normal': { Icon: Clock, color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800', title: 'Preços moderados' },
     'caro': { Icon: AlertTriangle, color: 'text-red-700 dark:text-red-300', bg: 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800', title: 'Energia cara' },
   }
