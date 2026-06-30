@@ -27,6 +27,7 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [user, setUser] = useState<{ email?: string | null } | null>(null)
   const [showIVA, setShowIVA] = useState(true)
+  const [loadedDate, setLoadedDate] = useState('')
 
   const today = getToday()
   const tomorrow = getTomorrow()
@@ -37,15 +38,19 @@ export default function Home() {
   }, [])
 
   const load = async () => {
+    // Usa datas frescas em cada chamada (não captura da closure inicial)
+    const t0 = getToday()
+    const t1 = getTomorrow()
     setLoading(true)
     try {
       const [t, tm] = await Promise.all([
-        fetchOmiePrices(formatDate(today)),
-        fetchOmiePrices(formatDate(tomorrow)),
+        fetchOmiePrices(formatDate(t0)),
+        fetchOmiePrices(formatDate(t1)),
       ])
       setTodayData(t)
       setTomorrowData(tm)
       setLastUpdated(new Date())
+      setLoadedDate(formatDate(t0))
     } catch {
       // Se falhar completamente, manter dados anteriores (se existirem)
     } finally {
@@ -54,6 +59,14 @@ export default function Home() {
   }
 
   useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Detetar mudança de dia e recarregar automaticamente (verifica a cada minuto)
+  useEffect(() => {
+    const check = setInterval(() => {
+      if (loadedDate && formatDate(getToday()) !== loadedDate) load()
+    }, 60000)
+    return () => clearInterval(check)
+  }, [loadedDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeData = activeDay === 'hoje' ? todayData : tomorrowData
   const date = activeDay === 'hoje' ? today : tomorrow
