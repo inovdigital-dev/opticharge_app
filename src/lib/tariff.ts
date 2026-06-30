@@ -79,7 +79,7 @@ export const DEFAULT_SETTINGS: TariffSettings = {
   go: 0,
   mfrr: 0,
   lossCoeff: 0.03,
-  iva: 0.06,
+  iva: 0.23,
   iespe: 0.001,
   power: 6.9,
   tarVazio: 0.0158,

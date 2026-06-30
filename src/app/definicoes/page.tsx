@@ -340,7 +340,7 @@ export default function Definicoes() {
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 space-y-4">
           <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Impostos e Perdas</h2>
           <div className="grid grid-cols-3 gap-3">
-            <Field label="IVA" hint="0.06 = 6%">
+            <Field label="IVA" hint="0.23 = 23%">
               <NumInput value={s.iva} onChange={v => update('iva', v)} step={0.01} />
             </Field>
             <Field label="IESPE (€/kWh)">
