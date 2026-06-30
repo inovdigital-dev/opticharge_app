@@ -4,18 +4,21 @@ import { getCachedPrices, cachePrices } from '@/lib/supabase'
 export async function GET(req: NextRequest) {
   const date = req.nextUrl.searchParams.get('date')
   const country = req.nextUrl.searchParams.get('country') ?? 'PT'
+  const force = req.nextUrl.searchParams.get('force') === 'true'
   if (!date) return NextResponse.json({ error: 'date required' }, { status: 400 })
 
-  // 1. Cache Supabase
-  try {
-    const cached = await getCachedPrices(date)
-    if (cached && cached.length >= 24) {
-      return NextResponse.json(cached.map(r => ({ hour: r.hour, price: r.price_mwh, date })))
-    }
-  } catch { /* sem cache */ }
+  // 1. Cache Supabase (ignorado se ?force=true)
+  if (!force) {
+    try {
+      const cached = await getCachedPrices(date)
+      if (cached && cached.length >= 24) {
+        return NextResponse.json(cached.map(r => ({ hour: r.hour, price: r.price_mwh, date })))
+      }
+    } catch { /* sem cache */ }
+  }
 
   // 2. OMIE
-  const result = await fetchFromOmie(date, country)
+  const result = await fetchFromOmie(date, country, force)
 
   // 3. Guardar cache se dados reais (não simulados)
   if (!result.isMock && result.prices.length >= 20) {
@@ -33,19 +36,16 @@ interface FetchResult {
   source: string
 }
 
-async function fetchFromOmie(date: string, country: string): Promise<FetchResult> {
-  // Ficheiro OMIE: marginalpdbc_YYYYMMDD.1
-  // Formato: FECHA;HORA(1-24);PRECIO_ES(€/MWh);PRECIO_PT(€/MWh)
-  // Coluna PT = índice 3, ES = índice 2
+async function fetchFromOmie(date: string, country: string, force = false): Promise<FetchResult> {
   const [year, month, day] = date.split('-')
-  const dateFormatted = `${day}${month}${year}` // OMIE usa DDMMYYYY no nome do ficheiro
+  const dateFormatted = `${day}${month}${year}`
 
   // Tentativa 1: ficheiro do mercado diário (mais fiável)
   const fileUrl = `https://www.omie.es/pt/file-download?parents%5B%5D=marginalpdbc&filename=marginalpdbc_${year}${month}${day}.1`
   try {
     const res = await fetch(fileUrl, {
       headers: { 'Accept': 'text/plain, */*' },
-      next: { revalidate: 3600 },
+      ...(force ? { cache: 'no-store' } : { next: { revalidate: 3600 } }),
     })
     if (res.ok) {
       const text = await res.text()
@@ -89,41 +89,46 @@ async function fetchFromOmie(date: string, country: string): Promise<FetchResult
 }
 
 function parseOmieFile(text: string, date: string, country: string) {
-  // Formato esperado: FECHA;HORA;PRECIO_ES;PRECIO_PT
-  // Header tem "Fecha" ou "FECHA" - ignorar
-  // Linhas com * são comentários - ignorar
-  const priceCol = country === 'ES' ? 2 : 3
+  // Formato real do ficheiro marginalpdbc:
+  //   YEAR;MONTH;DAY;SLOT(1-96);ES_PRICE;PT_PRICE
+  // São 96 quarto-horas (15 min) por dia.
+  // Portugal (WET/WEST) está 1h atrás de Espanha (CET/CEST):
+  //   Slots  1-4  → hora 23 PT (23:00–24:00)
+  //   Slots  5-8  → hora  0 PT (00:00–01:00)
+  //   Slots  9-12 → hora  1 PT (01:00–02:00)  …  etc.
+  const priceCol = country === 'ES' ? 4 : 5
 
   const lines = text.split('\n')
-  const prices: { hour: number; price: number; date: string }[] = []
+  const buckets = new Map<number, number[]>()
 
   for (const raw of lines) {
     const line = raw.trim()
-    if (!line || line.startsWith('*') || line.toLowerCase().startsWith('fecha') || line.toLowerCase().startsWith('hora')) continue
+    if (!line || line.startsWith('*') || line.toUpperCase().startsWith('MARGINAL')) continue
 
-    const parts = line.split(';').map(p => p.trim().replace(',', '.'))
+    const parts = line.split(';').map(p => p.trim())
     if (parts.length <= priceCol) continue
 
-    // A hora pode estar na coluna 1 (formato DD/MM/YYYY;H;...) ou coluna 0 pode ser só a hora
-    let hourRaw = parseInt(parts[1])
-    if (isNaN(hourRaw) || hourRaw < 1 || hourRaw > 24) {
-      // Tentar coluna 0 como hora
-      hourRaw = parseInt(parts[0])
-      if (isNaN(hourRaw) || hourRaw < 1 || hourRaw > 24) continue
-    }
+    const slot = parseInt(parts[3])
+    if (isNaN(slot) || slot < 1 || slot > 96) continue
 
-    const hour = hourRaw - 1 // OMIE usa 1-24, converter para 0-23
-    const price = parseFloat(parts[priceCol])
+    const price = parseFloat(parts[priceCol].replace(',', '.'))
+    if (isNaN(price) || price < 0 || price > 3000) continue
 
-    if (!isNaN(price) && price >= 0 && price < 1000 && hour >= 0 && hour <= 23) {
-      // Evitar duplicados (OMIE pode ter múltiplas linhas por hora em alguns ficheiros)
-      if (!prices.find(p => p.hour === hour)) {
-        prices.push({ hour, price, date })
-      }
-    }
+    // Converter slot OMIE (CET, offset +4 slots = +1h face a PT)
+    const hour = slot <= 4 ? 23 : Math.floor((slot - 5) / 4)
+    if (!buckets.has(hour)) buckets.set(hour, [])
+    buckets.get(hour)!.push(price)
   }
 
-  return prices.sort((a, b) => a.hour - b.hour)
+  if (buckets.size < 20) return []
+
+  const hourPrices: { hour: number; price: number; date: string }[] = []
+  for (const [hour, prices] of buckets) {
+    const avg = prices.reduce((s, p) => s + p, 0) / prices.length
+    hourPrices.push({ hour, price: avg, date })
+  }
+
+  return hourPrices.sort((a, b) => a.hour - b.hour)
 }
 
 function parseOmieApi(data: Record<string, unknown>, date: string) {
