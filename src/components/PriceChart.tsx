@@ -116,7 +116,7 @@ function buildSlotData(
     const priceA = hourMap.get(hour) ?? 0
     const priceB = hourMap.get(hour + 1) ?? priceA
     const omie = priceA + (priceB - priceA) * fraction
-    const omieKwh = omie / 1000
+    const omieKwh = Math.max(0, omie / 1000)
     const period = getPeriodForHour(hour, settings, date)
     const total = calcPrice(omie, period, settings)
     return { slot, hour, omie, omieKwh, total, period, isOptimal: optimalHours.includes(hour) }
@@ -173,7 +173,7 @@ export default function PriceChart({ prices, settings, date, isMock }: Props) {
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full" style={{ overflow: 'hidden' }}>
       {isMock && (
         <p className="text-xs text-amber-600 dark:text-amber-400 mb-2 text-center">
           ⚠️ Dados OMIE estimados — preços reais ainda não disponíveis
@@ -249,22 +249,26 @@ export default function PriceChart({ prices, settings, date, isMock }: Props) {
         </ComposedChart>
       </ResponsiveContainer>
 
-      {/* Faixa de períodos */}
-      <div className="flex h-5 overflow-hidden rounded-b-xl border-t border-gray-100 dark:border-gray-800">
-        {periodBlocks.map((block, i) => {
-          const width = (block.end - block.start + 1) / 96 * 100
-          return (
-            <div
-              key={i}
-              style={{ width: `${width}%`, background: PERIOD_BG[block.period] }}
-              className="flex items-center justify-center overflow-hidden"
-            >
-              <span className="text-white text-[8px] font-semibold truncate px-0.5 opacity-90">
-                {block.end - block.start >= 15 ? PERIOD_NAMES[block.period] : ''}
-              </span>
-            </div>
-          )
-        })}
+      {/* Faixa de períodos — offset para alinhar com a área de plotagem (YAxis=44px, margin-left=-4) */}
+      <div className="flex h-5 overflow-hidden border-t border-gray-100 dark:border-gray-800">
+        <div style={{ width: 40, flexShrink: 0 }} /> {/* espaço do YAxis */}
+        <div className="flex flex-1 overflow-hidden">
+          {periodBlocks.map((block, i) => {
+            const width = (block.end - block.start + 1) / 96 * 100
+            return (
+              <div
+                key={i}
+                style={{ width: `${width}%`, flexShrink: 0, background: PERIOD_BG[block.period] }}
+                className="flex items-center justify-center overflow-hidden"
+              >
+                <span className="text-white text-[8px] font-semibold truncate px-0.5 opacity-90">
+                  {block.end - block.start >= 15 ? PERIOD_NAMES[block.period] : ''}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+        <div style={{ width: 4, flexShrink: 0 }} /> {/* espaço da margem direita */}
       </div>
 
       {/* Legenda */}
