@@ -156,30 +156,6 @@ export default function Definicoes() {
 
       <main className="max-w-lg mx-auto px-4 py-4 space-y-4 pb-8">
 
-        {/* País e Idioma */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 space-y-4">
-          <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Região e Idioma</h2>
-          <Field label="País / Mercado OMIE">
-            <Toggle
-              value={s.country}
-              onChange={v => update('country', v)}
-              options={[
-                { value: 'PT', label: '🇵🇹 Portugal' },
-                { value: 'ES', label: '🇪🇸 Espanha' },
-              ]}
-            />
-          </Field>
-          <Field label="Idioma">
-            <Toggle
-              value={s.language}
-              onChange={v => update('language', v)}
-              options={[
-                { value: 'pt', label: 'Português' },
-                { value: 'es', label: 'Español' },
-              ]}
-            />
-          </Field>
-        </div>
 
         {/* Operador */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 space-y-4">

@@ -10,8 +10,8 @@ export type TariffOption =
 // Kept for backward compat / FormulaModal references
 export type TariffType = 'bi-horario' | 'tri-horario'
 export type Cycle = 'diario' | 'semanal'
-export type Country = 'PT' | 'ES'
-export type Language = 'pt' | 'es'
+export type Country = 'PT'
+export type Language = 'pt'
 
 export interface TariffSettings {
   tariffOption: TariffOption
