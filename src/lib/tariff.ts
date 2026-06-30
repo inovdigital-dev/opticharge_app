@@ -7,11 +7,17 @@ export interface TariffSettings {
   type: TariffType
   cycle: Cycle
   operator: string
-  margin: number
-  lossCoeff: number
-  iva: number
-  iespe: number
-  power: number
+  // Fórmula: (OMIE_kwh × adequacyFactor + innerCosts) × (1 + lossCoeff) + margin + TAR + tse + go + mfrr
+  adequacyFactor: number  // F_adeq / FA / K1 — multiplicador sobre OMIE (default 1.0)
+  innerCosts: number      // CGS/CS+CR dentro do multiplicador de perdas (default 0)
+  margin: number          // margem comercial + extras adicionados APÓS perdas
+  tse: number             // Tarifa Social de Electricidade (default 0)
+  go: number              // Garantias de Origem (default 0)
+  mfrr: number            // Banda mFRR Iberdrola (default 0)
+  lossCoeff: number       // Perdas da rede (estimativa — ERSE publica por quarto de hora)
+  iva: number             // IVA (6% electricidade PT)
+  iespe: number           // Imposto Especial sobre o Consumo de Electricidade
+  power: number           // Potência contratada (kVA)
   tarVazio: number
   tarForaVazio: number
   tarPonta: number
@@ -26,11 +32,18 @@ export const DEFAULT_SETTINGS: TariffSettings = {
   type: 'bi-horario',
   cycle: 'diario',
   operator: 'G9 Smart Dynamic',
-  margin: 0.0055,
+  // G9 Smart Dynamic: PE = OMIE × 1.02 × (1 + Perdas) + GGS(0.010) + AC(0.0055) + TAR
+  adequacyFactor: 1.02,
+  innerCosts: 0,
+  margin: 0.0155,       // GGS (0.0100) + AC (0.0055)
+  tse: 0,
+  go: 0,
+  mfrr: 0,
   lossCoeff: 0.03,
   iva: 0.06,
   iespe: 0.001,
   power: 6.9,
+  // TAR 2026 ERSE — BTN ≤ 20.7 kVA, ciclo diário
   tarVazio: 0.0158,
   tarForaVazio: 0.0835,
   tarPonta: 0.2452,
@@ -72,11 +85,29 @@ export function getTarForPeriod(period: Period, settings: TariffSettings): numbe
   }
 }
 
+// Fórmula unificada para todos os operadores indexados ao OMIE:
+// price = (OMIE_kwh × adequacyFactor + innerCosts) × (1 + lossCoeff)
+//         + margin + TAR + tse + go + mfrr
+// final = price × (1 + IVA) + IESPE
 export function calcPrice(omie_mwh: number, period: Period, settings: TariffSettings): number {
   const omie_kwh = omie_mwh / 1000
   const tar = getTarForPeriod(period, settings)
-  const base = omie_kwh * (1 + settings.lossCoeff) + settings.margin + tar
-  return base * (1 + settings.iva) + settings.iespe
+
+  const adeq = settings.adequacyFactor ?? 1.0
+  const inner = settings.innerCosts ?? 0
+  const tse = settings.tse ?? 0
+  const go = settings.go ?? 0
+  const mfrr = settings.mfrr ?? 0
+
+  const preTax =
+    (omie_kwh * adeq + inner) * (1 + settings.lossCoeff)
+    + settings.margin
+    + tar
+    + tse
+    + go
+    + mfrr
+
+  return preTax * (1 + settings.iva) + settings.iespe
 }
 
 export interface OptimalWindow {
@@ -110,14 +141,11 @@ export function findOptimalWindow(
   }))
 
   const avg = hourPrices.reduce((s, h) => s + h.total, 0) / hourPrices.length
-  // Threshold: horas abaixo da média são candidatas
   const threshold = avg * 0.95
   const cheapHours = hourPrices.filter(h => h.total <= threshold)
-
   const candidates = cheapHours.length >= 3 ? cheapHours : [...hourPrices].sort((a, b) => a.total - b.total).slice(0, 4)
   candidates.sort((a, b) => a.hour - b.hour)
 
-  // Agrupar em blocos contíguos
   const blocks: { hours: number[]; prices: number[] }[] = []
   let current: { hours: number[]; prices: number[] } | null = null
 
@@ -133,7 +161,6 @@ export function findOptimalWindow(
 
   if (!blocks.length) return null
 
-  // Melhor bloco = menor preço médio com pelo menos 1h
   const best = blocks.sort((a, b) => {
     const avgA = a.prices.reduce((s, v) => s + v, 0) / a.prices.length
     const avgB = b.prices.reduce((s, v) => s + v, 0) / b.prices.length

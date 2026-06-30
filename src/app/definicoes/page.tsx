@@ -3,18 +3,11 @@
 import { useState, useEffect } from 'react'
 import { loadSettings, saveSettings } from '@/lib/settings'
 import { TariffSettings, DEFAULT_SETTINGS } from '@/lib/tariff'
+import { OPERATORS, getOperatorByName } from '@/lib/operators'
+import FormulaModal from '@/components/FormulaModal'
 import Logo from '@/components/Logo'
 import Link from 'next/link'
-import { ArrowLeft, Save, RotateCcw } from 'lucide-react'
-
-const OPERATORS: { name: string; margin: number }[] = [
-  { name: 'G9 Smart Dynamic', margin: 0.0055 },
-  { name: 'EDP Comercial Indexado', margin: 0.0050 },
-  { name: 'Galp Indexado', margin: 0.0060 },
-  { name: 'Endesa Indexado', margin: 0.0048 },
-  { name: 'Iberdrola Indexado', margin: 0.0052 },
-  { name: 'Personalizado', margin: 0.005 },
-]
+import { ArrowLeft, Save, RotateCcw, Info } from 'lucide-react'
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -65,10 +58,14 @@ function Toggle({ value, options, onChange }: {
   )
 }
 
+const dinamicos = OPERATORS.filter(o => o.type === 'quarto-horario')
+const medios = OPERATORS.filter(o => o.type === 'media')
+
 export default function Definicoes() {
   const [s, setS] = useState<TariffSettings>(DEFAULT_SETTINGS)
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showFormula, setShowFormula] = useState(false)
 
   useEffect(() => { loadSettings().then(setS) }, [])
 
@@ -76,9 +73,21 @@ export default function Definicoes() {
     setS(prev => ({ ...prev, [key]: value }))
 
   const handleOperator = (name: string) => {
-    const op = OPERATORS.find(o => o.name === name)
-    if (op) setS(prev => ({ ...prev, operator: name, margin: op.margin }))
-    else setS(prev => ({ ...prev, operator: name }))
+    const op = getOperatorByName(name)
+    if (op) {
+      setS(prev => ({
+        ...prev,
+        operator: name,
+        adequacyFactor: op.adequacyFactor,
+        innerCosts: op.innerCosts,
+        margin: op.margin,
+        tse: op.tse,
+        go: op.go,
+        mfrr: op.mfrr,
+      }))
+    } else {
+      setS(prev => ({ ...prev, operator: name }))
+    }
   }
 
   const handleSave = async () => {
@@ -88,6 +97,8 @@ export default function Definicoes() {
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
+
+  const currentOperator = getOperatorByName(s.operator)
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -144,17 +155,60 @@ export default function Definicoes() {
         {/* Operador */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 space-y-4">
           <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Operador</h2>
-          <Field label="Operador comercial">
+
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Operador comercial
+              </label>
+              {currentOperator && (
+                <button
+                  onClick={() => setShowFormula(true)}
+                  className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors py-1 px-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950"
+                >
+                  <Info size={13} />
+                  Ver fórmula
+                </button>
+              )}
+            </div>
             <select
               value={s.operator}
               onChange={e => handleOperator(e.target.value)}
               className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {OPERATORS.map(o => <option key={o.name}>{o.name}</option>)}
+              <optgroup label="Dinâmicos (Quarto-Horário)">
+                {dinamicos.map(o => <option key={o.id} value={o.name}>{o.name}</option>)}
+              </optgroup>
+              <optgroup label="Média Mensal">
+                {medios.map(o => <option key={o.id} value={o.name}>{o.name}</option>)}
+              </optgroup>
             </select>
-          </Field>
+            {currentOperator && (
+              <p className="text-xs text-gray-400">
+                {currentOperator.company}
+                {currentOperator.type === 'media' && ' · ⚠️ Tarifa média — otimização horária tem menor impacto na fatura'}
+              </p>
+            )}
+          </div>
+
+          {/* Resumo dos parâmetros do preset */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5">
+              <div className="text-[10px] text-gray-400 mb-0.5">F. Adequação</div>
+              <div className="text-sm font-mono font-medium text-gray-800 dark:text-gray-200">{(s.adequacyFactor ?? 1).toFixed(2)}</div>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5">
+              <div className="text-[10px] text-gray-400 mb-0.5">Custos sist.</div>
+              <div className="text-sm font-mono font-medium text-gray-800 dark:text-gray-200">{((s.innerCosts ?? 0) * 1000).toFixed(1)} m€</div>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5">
+              <div className="text-[10px] text-gray-400 mb-0.5">Margem</div>
+              <div className="text-sm font-mono font-medium text-gray-800 dark:text-gray-200">{(s.margin * 1000).toFixed(1)} m€</div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Margem (€/kWh)" hint="Componente fixa do contrato">
+            <Field label="Margem total (€/kWh)" hint="Ajusta se diferente do teu contrato">
               <NumInput value={s.margin} onChange={v => update('margin', v)} />
             </Field>
             <Field label="Potência (kVA)">
@@ -245,35 +299,32 @@ export default function Definicoes() {
           </div>
         </div>
 
-        {/* Impostos */}
+        {/* Impostos e Perdas */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 space-y-4">
           <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Impostos e Perdas</h2>
           <div className="grid grid-cols-3 gap-3">
-            <Field label="IVA" hint="ex: 0.06">
+            <Field label="IVA" hint="0.06 = 6%">
               <NumInput value={s.iva} onChange={v => update('iva', v)} step={0.01} />
             </Field>
             <Field label="IESPE (€/kWh)">
               <NumInput value={s.iespe} onChange={v => update('iespe', v)} />
             </Field>
-            <Field label="Perdas rede" hint="ex: 0.03">
+            <Field label="Perdas rede" hint="0.03 = 3%">
               <NumInput value={s.lossCoeff} onChange={v => update('lossCoeff', v)} step={0.001} />
             </Field>
           </div>
         </div>
 
-        {/* Fórmula */}
-        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-2xl p-4">
-          <h3 className="text-xs font-semibold text-blue-800 dark:text-blue-200 mb-2 uppercase tracking-wide">Fórmula de cálculo (universal indexados)</h3>
-          <p className="text-xs text-blue-700 dark:text-blue-300 font-mono leading-relaxed">
-            Preço = (OMIE÷1000 × (1+perdas) + margem + TAR) × (1+IVA) + IESPE
-          </p>
-          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-            A fórmula é igual para todos os operadores indexados — só a margem varia. TAR regulada pela ERSE 2026.
-          </p>
-        </div>
-
         <div className="pb-4" />
       </main>
+
+      {showFormula && currentOperator && (
+        <FormulaModal
+          operator={currentOperator}
+          settings={s}
+          onClose={() => setShowFormula(false)}
+        />
+      )}
     </div>
   )
 }
