@@ -46,11 +46,13 @@ function buildExplanation(
   const savings = ((maxPrice - window.avgPrice) * 22).toFixed(2)
   const isOffPeakCheap = windowPeriods.includes('fora-vazio') && window.avgPrice < 0.08
 
+  const ivaStr = settings.iva > 0 ? ` + IVA ${(settings.iva * 100).toFixed(0)}%` : ' (s/ IVA)'
+
   if (isOffPeakCheap) {
-    return `Período ${windowPeriodLabel} (${fmt(window.startHour)}–${fmt(window.endHour)}): apesar da TAR ser mais elevada (${settings.tarForaVazio.toFixed(4)} €/kWh), o preço OMIE está muito baixo (${avgOmie.toFixed(2)} €/MWh), pelo que no somatório total — incluindo margem e IVA — compensa mais do que o período de Vazio. Poupança estimada por carregamento (~22 kWh): ~${savings}€ vs. carregar no pior horário.`
+    return `Período ${windowPeriodLabel} (${fmt(window.startHour)}–${fmt(window.endHour)}): apesar da TAR ser mais elevada (${settings.tarForaVazio.toFixed(4)} €/kWh), o preço OMIE está muito baixo (${avgOmie.toFixed(2)} €/MWh), pelo que no somatório total — incluindo margem${ivaStr} — compensa mais do que o período de Vazio. Poupança estimada por carregamento (~22 kWh): ~${savings}€ vs. carregar no pior horário.`
   }
 
-  return `Período ${windowPeriodLabel} (${fmt(window.startHour)}–${fmt(window.endHour)}): preço OMIE médio de ${avgOmie.toFixed(2)} €/MWh, resultando num custo total de ${window.avgPrice.toFixed(4)} €/kWh com TAR + margem + IVA incluídos. Poupança estimada por carregamento (~22 kWh): ~${savings}€ vs. pior horário.`
+  return `Período ${windowPeriodLabel} (${fmt(window.startHour)}–${fmt(window.endHour)}): preço OMIE médio de ${avgOmie.toFixed(2)} €/MWh, resultando num custo total de ${window.avgPrice.toFixed(4)} €/kWh com TAR + margem${ivaStr} incluídos. Poupança estimada por carregamento (~22 kWh): ~${savings}€ vs. pior horário.`
 }
 
 export default function RecommendationBox({ prices, settings, date, label }: Props) {
