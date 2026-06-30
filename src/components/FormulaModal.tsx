@@ -45,7 +45,7 @@ export default function FormulaModal({ operator, settings, onClose }: Props) {
     { label: 'OMIE × F_adeq × (1+Perdas)', value: omieNet, color: '#94a3b8' },
     ...(innerNet > 0 ? [{ label: 'Custos sistema × (1+Perdas)', value: innerNet, color: '#fb923c' }] : []),
     { label: 'Margem comercial', value: marginNet, color: '#60a5fa' },
-    { label: 'TAR ' + (settings.type === 'bi-horario' ? '(Fora Vazio)' : ''), value: tarNet, color: '#f97316' },
+    { label: 'TAR ' + (settings.tariffOption === 'simples' ? '(Simples)' : settings.tariffOption?.startsWith('bi') ? '(Fora Vazio)' : '(período)'), value: tarNet, color: '#f97316' },
     ...(extrasNet > 0 ? [{ label: 'TSE + GO + mFRR', value: extrasNet, color: '#a78bfa' }] : []),
     { label: 'IVA 6%', value: ivaAmt, color: '#34d399' },
     ...(settings.iespe > 0 ? [{ label: 'IESPE', value: settings.iespe, color: '#f43f5e' }] : []),

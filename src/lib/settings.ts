@@ -1,14 +1,23 @@
-import { TariffSettings, DEFAULT_SETTINGS } from './tariff'
+import { TariffSettings, DEFAULT_SETTINGS, deriveTariffOption } from './tariff'
 import { getUserSettings, saveUserSettings } from './supabase'
 
 const KEY = 'opticharge_settings'
+
+function migrate(saved: Partial<TariffSettings>): TariffSettings {
+  const merged = { ...DEFAULT_SETTINGS, ...saved }
+  // If tariffOption wasn't explicitly saved, derive from legacy type+cycle
+  if (!('tariffOption' in saved) && saved.type) {
+    merged.tariffOption = deriveTariffOption(saved.type, saved.cycle ?? 'diario')
+  }
+  return merged
+}
 
 export function loadSettingsLocal(): TariffSettings {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return DEFAULT_SETTINGS
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) }
+    return migrate(JSON.parse(raw))
   } catch {
     return DEFAULT_SETTINGS
   }
@@ -20,12 +29,12 @@ export function saveSettingsLocal(s: TariffSettings): void {
 }
 
 export async function loadSettings(): Promise<TariffSettings> {
-  // Tentar Supabase primeiro (utilizador autenticado)
   try {
     const remote = await getUserSettings()
     if (remote) {
-      saveSettingsLocal(remote) // sync local
-      return { ...DEFAULT_SETTINGS, ...remote }
+      const s = migrate(remote)
+      saveSettingsLocal(s)
+      return s
     }
   } catch { /* sem auth ou sem rede */ }
   return loadSettingsLocal()

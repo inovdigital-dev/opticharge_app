@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { fetchOmiePrices, formatDate, getToday, getTomorrow, OmiePrice } from '@/lib/omie'
 import { loadSettings } from '@/lib/settings'
-import { TariffSettings } from '@/lib/tariff'
+import { TariffSettings, TARIFF_OPTION_LABELS } from '@/lib/tariff'
 import { getUser, signOut } from '@/lib/supabase'
 import PriceChart from '@/components/PriceChart'
 import RecommendationBox from '@/components/RecommendationBox'
@@ -197,7 +197,7 @@ export default function Home() {
               </div>
               <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5">
                 <div className="text-xs text-gray-400 mb-0.5">Opção horária</div>
-                <div className="font-medium text-gray-800 dark:text-gray-200 text-xs">{settings.type === 'bi-horario' ? 'Bi-Horário' : 'Tri-Horário'}</div>
+                <div className="font-medium text-gray-800 dark:text-gray-200 text-xs">{TARIFF_OPTION_LABELS[settings.tariffOption] ?? settings.tariffOption}</div>
               </div>
               <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5">
                 <div className="text-xs text-gray-400 mb-0.5">TAR Vazio</div>

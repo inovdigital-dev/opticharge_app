@@ -1,41 +1,80 @@
+export type TariffOption =
+  | 'simples'
+  | 'bi-diario'
+  | 'bi-semanal'
+  | 'tri-diario'
+  | 'tri-semanal'
+  | 'tri-high-diario'
+  | 'tri-high-semanal'
+
+// Kept for backward compat / FormulaModal references
 export type TariffType = 'bi-horario' | 'tri-horario'
 export type Cycle = 'diario' | 'semanal'
 export type Country = 'PT' | 'ES'
 export type Language = 'pt' | 'es'
 
 export interface TariffSettings {
+  tariffOption: TariffOption
+  // Legacy fields — kept for backward compat, derived from tariffOption on save
   type: TariffType
   cycle: Cycle
   operator: string
   // Fórmula: (OMIE_kwh × adequacyFactor + innerCosts) × (1 + lossCoeff) + margin + TAR + tse + go + mfrr
-  adequacyFactor: number  // F_adeq / FA / K1 — multiplicador sobre OMIE (default 1.0)
-  innerCosts: number      // CGS/CS+CR dentro do multiplicador de perdas (default 0)
-  margin: number          // margem comercial + extras adicionados APÓS perdas
-  tse: number             // Tarifa Social de Electricidade (default 0)
-  go: number              // Garantias de Origem (default 0)
-  mfrr: number            // Banda mFRR Iberdrola (default 0)
-  lossCoeff: number       // Perdas da rede (estimativa — ERSE publica por quarto de hora)
-  iva: number             // IVA (6% electricidade PT)
-  iespe: number           // Imposto Especial sobre o Consumo de Electricidade
-  power: number           // Potência contratada (kVA)
+  adequacyFactor: number
+  innerCosts: number
+  margin: number
+  tse: number
+  go: number
+  mfrr: number
+  lossCoeff: number
+  iva: number
+  iespe: number
+  power: number
   tarVazio: number
   tarForaVazio: number
   tarPonta: number
   tarCheia: number
+  // Only used for Simples display; same value as tarForaVazio when Simples is selected
   biVazioStart: number
   biVazioEnd: number
   country: Country
   language: Language
 }
 
+// TAR 2026 ERSE — valores por opção horária
+export const TAR_PRESETS: Record<TariffOption, Pick<TariffSettings, 'tarVazio' | 'tarForaVazio' | 'tarCheia' | 'tarPonta'>> = {
+  'simples':          { tarForaVazio: 0.0607, tarVazio: 0.0607, tarCheia: 0.0607, tarPonta: 0.0607 },
+  'bi-diario':        { tarForaVazio: 0.0835, tarVazio: 0.0158, tarCheia: 0.0412, tarPonta: 0.2452 },
+  'bi-semanal':       { tarForaVazio: 0.0835, tarVazio: 0.0158, tarCheia: 0.0412, tarPonta: 0.2452 },
+  'tri-diario':       { tarForaVazio: 0.0835, tarVazio: 0.0158, tarCheia: 0.0412, tarPonta: 0.2452 },
+  'tri-semanal':      { tarForaVazio: 0.0835, tarVazio: 0.0158, tarCheia: 0.0412, tarPonta: 0.2452 },
+  'tri-high-diario':  { tarForaVazio: 0.0835, tarVazio: 0.0150, tarCheia: 0.0524, tarPonta: 0.2457 },
+  'tri-high-semanal': { tarForaVazio: 0.0835, tarVazio: 0.0150, tarCheia: 0.0524, tarPonta: 0.2457 },
+}
+
+export const TARIFF_OPTION_LABELS: Record<TariffOption, string> = {
+  'simples':          'Simples',
+  'bi-diario':        'Bi-horário — Ciclo Diário',
+  'bi-semanal':       'Bi-horário — Ciclo Semanal',
+  'tri-diario':       'Tri-horário — Ciclo Diário',
+  'tri-semanal':      'Tri-horário — Ciclo Semanal',
+  'tri-high-diario':  'Tri-horário > 20.7 kVA — Ciclo Diário',
+  'tri-high-semanal': 'Tri-horário > 20.7 kVA — Ciclo Semanal',
+}
+
+export function deriveTariffOption(type: TariffType, cycle: Cycle): TariffOption {
+  if (type === 'bi-horario') return cycle === 'semanal' ? 'bi-semanal' : 'bi-diario'
+  return cycle === 'semanal' ? 'tri-semanal' : 'tri-diario'
+}
+
 export const DEFAULT_SETTINGS: TariffSettings = {
+  tariffOption: 'bi-diario',
   type: 'bi-horario',
   cycle: 'diario',
   operator: 'G9 Smart Dynamic',
-  // G9 Smart Dynamic: PE = OMIE × 1.02 × (1 + Perdas) + GGS(0.010) + AC(0.0055) + TAR
   adequacyFactor: 1.02,
   innerCosts: 0,
-  margin: 0.0155,       // GGS (0.0100) + AC (0.0055)
+  margin: 0.0155,
   tse: 0,
   go: 0,
   mfrr: 0,
@@ -43,7 +82,6 @@ export const DEFAULT_SETTINGS: TariffSettings = {
   iva: 0.06,
   iespe: 0.001,
   power: 6.9,
-  // TAR 2026 ERSE — BTN ≤ 20.7 kVA, ciclo diário
   tarVazio: 0.0158,
   tarForaVazio: 0.0835,
   tarPonta: 0.2452,
@@ -57,23 +95,54 @@ export const DEFAULT_SETTINGS: TariffSettings = {
 export type Period = 'vazio' | 'fora-vazio' | 'ponta' | 'cheia'
 
 export function getPeriodForHour(hour: number, settings: TariffSettings, date: Date): Period {
+  const opt = settings.tariffOption
+  if (opt === 'simples') return 'fora-vazio'
+
   const dow = date.getDay()
   const isWeekend = dow === 0 || dow === 6
+  const inVazioBlocoNocturno = hour >= 22 || hour < 8
 
-  if (settings.type === 'bi-horario') {
-    if (settings.cycle === 'diario') {
-      const inVazio = hour >= settings.biVazioStart || hour < settings.biVazioEnd
-      return inVazio ? 'vazio' : 'fora-vazio'
+  switch (opt) {
+    case 'bi-diario':
+      return inVazioBlocoNocturno ? 'vazio' : 'fora-vazio'
+
+    case 'bi-semanal':
+      if (isWeekend) return 'vazio'
+      return inVazioBlocoNocturno ? 'vazio' : 'fora-vazio'
+
+    // Tri-horário ≤20.7 kVA
+    // Dias úteis — Ponta: 10h–13h e 19h–21h
+    // Sábados/Dom/Feriados — sem Ponta; Dom/Feriados (Semanal) = Vazio todo o dia
+    case 'tri-diario': {
+      if (inVazioBlocoNocturno) return 'vazio'
+      if (isWeekend) return hour < 9 ? 'vazio' : 'cheia'
+      if ((hour >= 10 && hour < 13) || (hour >= 19 && hour < 21)) return 'ponta'
+      return 'cheia'
     }
-    if (isWeekend) return 'vazio'
-    return hour < 7 ? 'vazio' : 'fora-vazio'
-  }
 
-  if (isWeekend) return 'vazio'
-  if (hour < 8 || hour >= 22) return 'vazio'
-  const isPonta = (hour >= 10 && hour < 13) || (hour >= 19 && hour < 21)
-  if (isPonta) return 'ponta'
-  return 'cheia'
+    case 'tri-semanal': {
+      if (isWeekend) return 'vazio'
+      if (inVazioBlocoNocturno) return 'vazio'
+      if ((hour >= 10 && hour < 13) || (hour >= 19 && hour < 21)) return 'ponta'
+      return 'cheia'
+    }
+
+    // Tri-horário >20.7 kVA
+    // Dias úteis — Ponta: 9h30–12h00 e 18h30–21h30 → arredondado: 10h–12h e 19h–22h
+    case 'tri-high-diario': {
+      if (inVazioBlocoNocturno) return 'vazio'
+      if (isWeekend) return hour < 9 ? 'vazio' : 'cheia'
+      if ((hour >= 10 && hour < 12) || (hour >= 19 && hour < 22)) return 'ponta'
+      return 'cheia'
+    }
+
+    case 'tri-high-semanal': {
+      if (isWeekend) return 'vazio'
+      if (inVazioBlocoNocturno) return 'vazio'
+      if ((hour >= 10 && hour < 12) || (hour >= 19 && hour < 22)) return 'ponta'
+      return 'cheia'
+    }
+  }
 }
 
 export function getTarForPeriod(period: Period, settings: TariffSettings): number {
@@ -85,14 +154,9 @@ export function getTarForPeriod(period: Period, settings: TariffSettings): numbe
   }
 }
 
-// Fórmula unificada para todos os operadores indexados ao OMIE:
-// price = (OMIE_kwh × adequacyFactor + innerCosts) × (1 + lossCoeff)
-//         + margin + TAR + tse + go + mfrr
-// final = price × (1 + IVA) + IESPE
 export function calcPrice(omie_mwh: number, period: Period, settings: TariffSettings): number {
   const omie_kwh = omie_mwh / 1000
   const tar = getTarForPeriod(period, settings)
-
   const adeq = settings.adequacyFactor ?? 1.0
   const inner = settings.innerCosts ?? 0
   const tse = settings.tse ?? 0
@@ -101,11 +165,7 @@ export function calcPrice(omie_mwh: number, period: Period, settings: TariffSett
 
   const preTax =
     (omie_kwh * adeq + inner) * (1 + settings.lossCoeff)
-    + settings.margin
-    + tar
-    + tse
-    + go
-    + mfrr
+    + settings.margin + tar + tse + go + mfrr
 
   return preTax * (1 + settings.iva) + settings.iespe
 }

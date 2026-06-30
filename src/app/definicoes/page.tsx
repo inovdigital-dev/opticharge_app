@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { loadSettings, saveSettings } from '@/lib/settings'
-import { TariffSettings, DEFAULT_SETTINGS } from '@/lib/tariff'
+import { TariffSettings, DEFAULT_SETTINGS, TariffOption, TAR_PRESETS, TARIFF_OPTION_LABELS, deriveTariffOption } from '@/lib/tariff'
 import { OPERATORS, getOperatorByName } from '@/lib/operators'
 import FormulaModal from '@/components/FormulaModal'
 import Logo from '@/components/Logo'
@@ -61,6 +61,13 @@ function Toggle({ value, options, onChange }: {
 const dinamicos = OPERATORS.filter(o => o.type === 'quarto-horario')
 const medios = OPERATORS.filter(o => o.type === 'media')
 
+const HIGH_POWER_OPTIONS = [27.6, 34.5, 41.4]
+const STD_POWER_OPTIONS = [1.15, 2.3, 3.45, 4.6, 5.75, 6.9, 10.35, 13.8, 17.25, 20.7]
+
+const isHighPower = (opt: TariffOption) => opt === 'tri-high-diario' || opt === 'tri-high-semanal'
+const isTri = (opt: TariffOption) => opt.startsWith('tri')
+const isBi = (opt: TariffOption) => opt.startsWith('bi')
+
 export default function Definicoes() {
   const [s, setS] = useState<TariffSettings>(DEFAULT_SETTINGS)
   const [saved, setSaved] = useState(false)
@@ -71,6 +78,22 @@ export default function Definicoes() {
 
   const update = (key: keyof TariffSettings, value: unknown) =>
     setS(prev => ({ ...prev, [key]: value }))
+
+  const handleTariffOption = (opt: TariffOption) => {
+    const tar = TAR_PRESETS[opt]
+    const type = isTri(opt) ? 'tri-horario' : 'bi-horario'
+    const cycle = opt.endsWith('semanal') ? 'semanal' : 'diario'
+    setS(prev => ({
+      ...prev,
+      tariffOption: opt,
+      type,
+      cycle,
+      ...tar,
+      power: isHighPower(opt)
+        ? (HIGH_POWER_OPTIONS.includes(prev.power) ? prev.power : 27.6)
+        : (STD_POWER_OPTIONS.includes(prev.power) ? prev.power : 6.9),
+    }))
+  }
 
   const handleOperator = (name: string) => {
     const op = getOperatorByName(name)
@@ -92,13 +115,19 @@ export default function Definicoes() {
 
   const handleSave = async () => {
     setSaving(true)
-    await saveSettings(s)
+    const toSave: TariffSettings = {
+      ...s,
+      type: isTri(s.tariffOption) ? 'tri-horario' : 'bi-horario',
+      cycle: deriveTariffOption(isTri(s.tariffOption) ? 'tri-horario' : 'bi-horario', s.tariffOption.endsWith('semanal') ? 'semanal' : 'diario').endsWith('semanal') ? 'semanal' : 'diario',
+    }
+    await saveSettings(toSave)
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
 
   const currentOperator = getOperatorByName(s.operator)
+  const powerOptions = isHighPower(s.tariffOption) ? HIGH_POWER_OPTIONS : STD_POWER_OPTIONS
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -191,7 +220,6 @@ export default function Definicoes() {
             )}
           </div>
 
-          {/* Resumo dos parâmetros do preset */}
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5">
               <div className="text-[10px] text-gray-400 mb-0.5">F. Adequação</div>
@@ -217,7 +245,7 @@ export default function Definicoes() {
                 onChange={e => update('power', parseFloat(e.target.value))}
                 className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {[1.15, 2.3, 3.45, 4.6, 5.75, 6.9, 10.35, 13.8, 17.25, 20.7].map(v => (
+                {powerOptions.map(v => (
                   <option key={v} value={v}>{v} kVA</option>
                 ))}
               </select>
@@ -225,78 +253,111 @@ export default function Definicoes() {
           </div>
         </div>
 
-        {/* Tarifário */}
+        {/* Opção Horária */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 space-y-4">
-          <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Opção Horária</h2>
+          <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Opção Horária e Ciclo</h2>
+
           <Field label="Tipo de tarifário">
-            <Toggle
-              value={s.type}
-              onChange={v => update('type', v)}
-              options={[
-                { value: 'bi-horario', label: 'Bi-Horário' },
-                { value: 'tri-horario', label: 'Tri-Horário' },
-              ]}
-            />
+            <select
+              value={s.tariffOption}
+              onChange={e => handleTariffOption(e.target.value as TariffOption)}
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {(Object.keys(TARIFF_OPTION_LABELS) as TariffOption[]).map(opt => (
+                <option key={opt} value={opt}>{TARIFF_OPTION_LABELS[opt]}</option>
+              ))}
+            </select>
           </Field>
-          {s.type === 'bi-horario' && (
-            <>
-              <Field label="Ciclo">
-                <Toggle
-                  value={s.cycle}
-                  onChange={v => update('cycle', v)}
-                  options={[
-                    { value: 'diario', label: 'Diário' },
-                    { value: 'semanal', label: 'Semanal' },
-                  ]}
-                />
-              </Field>
-              {s.cycle === 'diario' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Início do Vazio (h)">
-                    <NumInput value={s.biVazioStart} onChange={v => update('biVazioStart', v)} step={1} />
-                  </Field>
-                  <Field label="Fim do Vazio (h)">
-                    <NumInput value={s.biVazioEnd} onChange={v => update('biVazioEnd', v)} step={1} />
-                  </Field>
-                </div>
-              )}
-            </>
-          )}
+
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 space-y-1 text-xs text-gray-600 dark:text-gray-400">
+            {s.tariffOption === 'simples' && (
+              <p>Tarifa única — o mesmo custo por kWh a qualquer hora do dia.</p>
+            )}
+            {isBi(s.tariffOption) && (
+              <>
+                <p><span className="font-semibold text-green-600">Vazio</span>&nbsp;
+                  {s.tariffOption === 'bi-semanal'
+                    ? '22h–08h (dias úteis) + fim de semana todo'
+                    : '22h–08h (todos os dias)'}
+                </p>
+                <p><span className="font-semibold text-orange-500">Fora de Vazio</span>&nbsp;
+                  {s.tariffOption === 'bi-semanal' ? '08h–22h (dias úteis)' : '08h–22h (todos os dias)'}
+                </p>
+              </>
+            )}
+            {isTri(s.tariffOption) && !isHighPower(s.tariffOption) && (
+              <>
+                <p className="font-medium text-gray-700 dark:text-gray-300">Dias úteis:</p>
+                <p><span className="font-semibold text-green-600">Vazio</span> 00h–08h e 22h–24h</p>
+                <p><span className="font-semibold text-amber-600">Cheia</span> 08h–10h, 13h–19h, 21h–22h</p>
+                <p><span className="font-semibold text-red-600">Ponta</span> 10h–13h e 19h–21h</p>
+                <p className="text-gray-400">
+                  {s.tariffOption === 'tri-diario'
+                    ? 'Sáb/Dom/Feriados: Vazio 00h–09h, Cheia 09h–22h'
+                    : 'Sáb/Dom/Feriados: Vazio todo o dia'}
+                </p>
+              </>
+            )}
+            {isHighPower(s.tariffOption) && (
+              <>
+                <p className="font-medium text-gray-700 dark:text-gray-300">Dias úteis (BTN &gt;20.7 kVA):</p>
+                <p><span className="font-semibold text-green-600">Vazio</span> 00h–08h e 22h–24h</p>
+                <p><span className="font-semibold text-amber-600">Cheia</span> 08h–10h, 12h–19h, 22h</p>
+                <p><span className="font-semibold text-red-600">Ponta</span> 10h–12h e 19h–22h <span className="text-gray-400">(ERSE: 9h30–12h e 18h30–21h30)</span></p>
+                <p className="text-gray-400">
+                  {s.tariffOption === 'tri-high-diario'
+                    ? 'Sáb/Dom/Feriados: Vazio 00h–09h, Cheia 09h–22h'
+                    : 'Sáb/Dom/Feriados: Vazio todo o dia'}
+                </p>
+              </>
+            )}
+          </div>
         </div>
 
         {/* TAR */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900 dark:text-white text-sm">TAR — Acesso às Redes 2026</h2>
+            <div>
+              <h2 className="font-semibold text-gray-900 dark:text-white text-sm">TAR — Acesso às Redes 2026</h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {isHighPower(s.tariffOption) ? 'BTN >20.7 kVA' : 'BTN ≤20.7 kVA'}
+              </p>
+            </div>
             <button
-              onClick={() => setS(prev => ({
-                ...prev,
-                tarVazio: DEFAULT_SETTINGS.tarVazio,
-                tarForaVazio: DEFAULT_SETTINGS.tarForaVazio,
-                tarPonta: DEFAULT_SETTINGS.tarPonta,
-                tarCheia: DEFAULT_SETTINGS.tarCheia,
-              }))}
+              onClick={() => setS(prev => ({ ...prev, ...TAR_PRESETS[prev.tariffOption] }))}
               className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
             >
               <RotateCcw size={11} /> Repor
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Vazio (€/kWh)">
-              <NumInput value={s.tarVazio} onChange={v => update('tarVazio', v)} />
+
+          {s.tariffOption === 'simples' ? (
+            <Field label="TAR Simples (€/kWh)">
+              <NumInput value={s.tarForaVazio} onChange={v => setS(prev => ({
+                ...prev, tarForaVazio: v, tarVazio: v, tarCheia: v, tarPonta: v,
+              }))} />
             </Field>
-            <Field label="Fora de Vazio (€/kWh)">
-              <NumInput value={s.tarForaVazio} onChange={v => update('tarForaVazio', v)} />
-            </Field>
-            {s.type === 'tri-horario' && <>
-              <Field label="Cheia (€/kWh)">
-                <NumInput value={s.tarCheia} onChange={v => update('tarCheia', v)} />
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Vazio (€/kWh)">
+                <NumInput value={s.tarVazio} onChange={v => update('tarVazio', v)} />
               </Field>
-              <Field label="Ponta (€/kWh)">
-                <NumInput value={s.tarPonta} onChange={v => update('tarPonta', v)} />
-              </Field>
-            </>}
-          </div>
+              {isBi(s.tariffOption) ? (
+                <Field label="Fora de Vazio (€/kWh)">
+                  <NumInput value={s.tarForaVazio} onChange={v => update('tarForaVazio', v)} />
+                </Field>
+              ) : (
+                <>
+                  <Field label="Cheia (€/kWh)">
+                    <NumInput value={s.tarCheia} onChange={v => update('tarCheia', v)} />
+                  </Field>
+                  <Field label="Ponta (€/kWh)">
+                    <NumInput value={s.tarPonta} onChange={v => update('tarPonta', v)} />
+                  </Field>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Impostos e Perdas */}
