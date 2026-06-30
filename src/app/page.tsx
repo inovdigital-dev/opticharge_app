@@ -37,15 +37,15 @@ export default function Home() {
     getUser().then(u => setUser(u ? { email: u.email } : null))
   }, [])
 
-  const load = async () => {
+  const load = async (force = false) => {
     // Usa datas frescas em cada chamada (não captura da closure inicial)
     const t0 = getToday()
     const t1 = getTomorrow()
     setLoading(true)
     try {
       const [t, tm] = await Promise.all([
-        fetchOmiePrices(formatDate(t0)),
-        fetchOmiePrices(formatDate(t1)),
+        fetchOmiePrices(formatDate(t0), force),
+        fetchOmiePrices(formatDate(t1), force),
       ])
       setTodayData(t)
       setTomorrowData(tm)
@@ -68,6 +68,15 @@ export default function Home() {
     return () => clearInterval(check)
   }, [loadedDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Polling quando dados indisponíveis — verifica a cada 5 min com force=true para bypassar cache
+  useEffect(() => {
+    const unavailable = todayData.isMock || tomorrowData.isMock ||
+      todayData.source === 'not-published-yet' || tomorrowData.source === 'not-published-yet'
+    if (!unavailable) return
+    const poll = setInterval(() => load(true), 5 * 60 * 1000)
+    return () => clearInterval(poll)
+  }, [todayData.isMock, todayData.source, tomorrowData.isMock, tomorrowData.source]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const activeData = activeDay === 'hoje' ? todayData : tomorrowData
   const date = activeDay === 'hoje' ? today : tomorrow
   const dayLabel = activeDay === 'hoje' ? 'Hoje' : 'Amanhã'
@@ -82,6 +91,7 @@ export default function Home() {
 
   // D+1 ainda não publicado (source = 'not-published-yet' e sem preços)
   const tomorrowNotPublished = tomorrowData.source === 'not-published-yet' && tomorrowData.prices.length === 0
+  const dataUnavailable = activeData.isMock || activeData.source === 'not-published-yet'
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -138,79 +148,107 @@ export default function Home() {
                   : tomorrow.toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' })}
               </span>
               {/* Indicador quando D+1 ainda não disponível */}
-              {day === 'amanha' && tomorrowNotPublished && (
+              {day === 'amanha' && (tomorrowNotPublished || tomorrowData.isMock) && (
                 <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-400 rounded-full border-2 border-white dark:border-gray-900" />
               )}
             </button>
           ))}
         </div>
 
-        {/* Aviso D+1 ainda não publicado */}
-        {activeDay === 'amanha' && tomorrowNotPublished && !loading && (
-          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-xl p-3.5 flex items-start gap-3">
-            <Clock size={16} className="text-blue-500 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                Preços de amanhã ainda não publicados
-              </p>
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
-                O OMIE publica os preços diários por volta das 13h30.
-                Volta mais tarde ou activa as notificações push para saber quando estiverem disponíveis.
-              </p>
+        {/* Gráfico / Mensagem indisponibilidade */}
+        {loading ? (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
+            <div className="h-48 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-2 text-gray-400">
+                <RefreshCw size={22} className="animate-spin" />
+                <span className="text-xs">A carregar preços OMIE...</span>
+              </div>
             </div>
           </div>
-        )}
-
-        {/* Gráfico */}
-        {!(activeDay === 'amanha' && tomorrowNotPublished) && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Preço da energia</h2>
-                <p className="text-xs text-gray-400 capitalize">{fmtDate(date)}</p>
-              </div>
-              <div className="flex flex-col items-end gap-1.5">
-                {/* Toggle IVA */}
-                <button
-                  onClick={() => setShowIVA(v => !v)}
-                  className="flex items-center gap-1.5 group"
-                  aria-label="Incluir IVA nos preços"
-                >
-                  <span className={`text-[10px] font-medium transition-colors ${showIVA ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}`}>
-                    {showIVA ? 'c/ IVA 23%' : 's/ IVA'}
-                  </span>
-                  <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${showIVA ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${showIVA ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
-                  </div>
-                </button>
-                {lastUpdated && (
-                  <span className="text-xs text-gray-400">
-                    {lastUpdated.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                )}
-              </div>
+        ) : dataUnavailable ? (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-8 flex flex-col items-center text-center gap-5">
+            <div className="w-16 h-16 bg-amber-50 dark:bg-amber-950 rounded-2xl flex items-center justify-center">
+              <Clock size={32} className="text-amber-400" />
             </div>
-            {loading ? (
-              <div className="h-48 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-2 text-gray-400">
-                  <RefreshCw size={22} className="animate-spin" />
-                  <span className="text-xs">A carregar preços OMIE...</span>
+            {activeData.source === 'not-published-yet' ? (
+              <>
+                <div className="space-y-1">
+                  <h2 className="font-bold text-gray-900 dark:text-white">
+                    Preços de {dayLabel.toLowerCase()} ainda não publicados
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">{fmtDate(date)}</p>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300 max-w-xs">
+                  A OMIE publica os preços do dia seguinte normalmente entre as{' '}
+                  <strong>12h30</strong> e as <strong>13h30</strong>.
+                </p>
+                <p className="text-xs text-gray-400">
+                  A app verificará automaticamente e atualizará quando os preços estiverem disponíveis.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <h2 className="font-bold text-gray-900 dark:text-white">
+                    Preços reais não disponíveis
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">{fmtDate(date)}</p>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300 max-w-xs">
+                  Não foi possível obter dados OMIE reais no momento.
+                </p>
+              </>
+            )}
+            <button
+              onClick={() => load(true)}
+              className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
+            >
+              <RefreshCw size={14} />
+              Verificar agora
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Preço da energia</h2>
+                  <p className="text-xs text-gray-400 capitalize">{fmtDate(date)}</p>
+                </div>
+                <div className="flex flex-col items-end gap-1.5">
+                  {/* Toggle IVA */}
+                  <button
+                    onClick={() => setShowIVA(v => !v)}
+                    className="flex items-center gap-1.5 group"
+                    aria-label="Incluir IVA nos preços"
+                  >
+                    <span className={`text-[10px] font-medium transition-colors ${showIVA ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}`}>
+                      {showIVA ? 'c/ IVA 23%' : 's/ IVA'}
+                    </span>
+                    <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${showIVA ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${showIVA ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
+                    </div>
+                  </button>
+                  {lastUpdated && (
+                    <span className="text-xs text-gray-400">
+                      {lastUpdated.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
                 </div>
               </div>
-            ) : effectiveSettings ? (
-              <PriceChart
-                prices={activeData.prices}
-                settings={effectiveSettings}
-                date={date}
-                isMock={activeData.isMock}
-              />
-            ) : null}
-          </div>
-        )}
-
-        {/* Recomendação */}
-        {!loading && effectiveSettings && activeData.prices.length > 0 && (
-          <RecommendationBox prices={activeData.prices} settings={effectiveSettings} date={date} label={dayLabel} />
+              {effectiveSettings && (
+                <PriceChart
+                  prices={activeData.prices}
+                  settings={effectiveSettings}
+                  date={date}
+                  isMock={activeData.isMock}
+                />
+              )}
+            </div>
+            {effectiveSettings && activeData.prices.length > 0 && (
+              <RecommendationBox prices={activeData.prices} settings={effectiveSettings} date={date} label={dayLabel} />
+            )}
+          </>
         )}
 
         {/* Info tarifário */}
