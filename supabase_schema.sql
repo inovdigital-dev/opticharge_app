@@ -1,3 +1,14 @@
+-- Definições por utilizador (sincroniza entre dispositivos)
+create table if not exists user_settings (
+  id         uuid references auth.users primary key,
+  settings   jsonb not null default '{}',
+  updated_at timestamptz default now()
+);
+alter table user_settings enable row level security;
+create policy "Utilizador lê próprias definições" on user_settings for select using (auth.uid() = id);
+create policy "Utilizador guarda próprias definições" on user_settings for insert with check (auth.uid() = id);
+create policy "Utilizador atualiza próprias definições" on user_settings for update using (auth.uid() = id);
+
 -- Cache de preços OMIE (evita bater na API a cada visita)
 create table if not exists omie_prices (
   id          bigserial primary key,
