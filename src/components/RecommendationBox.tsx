@@ -47,10 +47,10 @@ function buildExplanation(
   const isOffPeakCheap = windowPeriods.includes('fora-vazio') && window.avgPrice < 0.08
 
   if (isOffPeakCheap) {
-    return `Período ${windowPeriodLabel} (${fmt(window.startHour)}–${fmt(window.endHour)}): apesar da TAR ser mais elevada (${(settings.tarForaVazio * 100).toFixed(1)} cênt/kWh), o preço OMIE está muito baixo (${avgOmie.toFixed(1)} €/MWh), pelo que no somatório total — incluindo margem e IVA — compensa mais do que o período de Vazio. Poupança estimada por carregamento (~22 kWh): ~${savings}€ vs. carregar no pior horário.`
+    return `Período ${windowPeriodLabel} (${fmt(window.startHour)}–${fmt(window.endHour)}): apesar da TAR ser mais elevada (${settings.tarForaVazio.toFixed(4)} €/kWh), o preço OMIE está muito baixo (${avgOmie.toFixed(2)} €/MWh), pelo que no somatório total — incluindo margem e IVA — compensa mais do que o período de Vazio. Poupança estimada por carregamento (~22 kWh): ~${savings}€ vs. carregar no pior horário.`
   }
 
-  return `Período ${windowPeriodLabel} (${fmt(window.startHour)}–${fmt(window.endHour)}): preço OMIE médio de ${avgOmie.toFixed(1)} €/MWh, resultando num custo total de ${(window.avgPrice * 100).toFixed(2)} cênt/kWh com TAR + margem + IVA incluídos. Poupança estimada por carregamento (~22 kWh): ~${savings}€ vs. pior horário.`
+  return `Período ${windowPeriodLabel} (${fmt(window.startHour)}–${fmt(window.endHour)}): preço OMIE médio de ${avgOmie.toFixed(2)} €/MWh, resultando num custo total de ${window.avgPrice.toFixed(4)} €/kWh com TAR + margem + IVA incluídos. Poupança estimada por carregamento (~22 kWh): ~${savings}€ vs. pior horário.`
 }
 
 export default function RecommendationBox({ prices, settings, date, label }: Props) {
@@ -100,17 +100,17 @@ export default function RecommendationBox({ prices, settings, date, label }: Pro
         </div>
         <div className="text-right">
           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {(window.avgPrice * 100).toFixed(2)}
+            {window.avgPrice.toFixed(4)}
           </div>
-          <div className="text-xs text-gray-400">cênt/kWh</div>
+          <div className="text-xs text-gray-400">€/kWh</div>
         </div>
       </div>
 
       {/* Stats */}
       <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
-        <span>Mín: <strong className="text-green-600">{(minPrice * 100).toFixed(2)}¢</strong></span>
-        <span>Média: <strong>{(avgPrice * 100).toFixed(2)}¢</strong></span>
-        <span>Máx: <strong className="text-red-600">{(maxPrice * 100).toFixed(2)}¢</strong></span>
+        <span>Mín: <strong className="text-green-600">{minPrice.toFixed(4)} €/kWh</strong></span>
+        <span>Média: <strong>{avgPrice.toFixed(4)} €/kWh</strong></span>
+        <span>Máx: <strong className="text-red-600">{maxPrice.toFixed(4)} €/kWh</strong></span>
       </div>
 
       {/* Explicação */}
