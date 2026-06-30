@@ -22,7 +22,11 @@ export async function fetchOmiePrices(date: string): Promise<OmieFetchResult> {
 }
 
 export function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0]
+  // Usar hora local (não UTC) para não trocar datas a partir da meia-noite em Portugal (UTC+1)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 export function getTomorrow(): Date {

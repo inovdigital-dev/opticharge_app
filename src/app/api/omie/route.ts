@@ -68,16 +68,14 @@ async function fetchFromOmie(date: string, country: string, force = false): Prom
     }
   } catch { /* fallthrough */ }
 
-  // Verificar se D+1 ainda não foi publicado (antes das 13h30)
-  const now = new Date()
-  const targetDate = new Date(date)
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const isTomorrow = targetDate.toDateString() === tomorrow.toDateString()
-  const hourNow = now.getHours()
-  if (isTomorrow && hourNow < 13) {
-    // D+1 ainda não publicado — retornar vazio (UI trata este caso)
-    console.warn(`OMIE: preços D+1 (${date}) ainda não publicados (${hourNow}h < 13h30)`)
+  // Verificar se D+1 ainda não foi publicado (OMIE publica ~11:30 UTC)
+  // Comparar strings ISO (YYYY-MM-DD) em UTC para evitar problemas de fuso horário
+  const nowUTC = new Date()
+  const todayUTCStr = nowUTC.toISOString().split('T')[0]
+  const isFutureDate = date > todayUTCStr
+  const hourUTC = nowUTC.getUTCHours()
+  if (isFutureDate && hourUTC < 13) {
+    console.warn(`OMIE: preços D+1 (${date}) ainda não publicados (${hourUTC}h UTC < 13h UTC)`)
     void dateFormatted
     return { prices: [], isMock: false, source: 'not-published-yet' }
   }
