@@ -17,15 +17,18 @@ interface DataPoint {
   isOptimal: boolean
 }
 
-// Cores por quartil do preço final (Baixo→Elevado)
-const QUARTIL_COLORS = ['#15803d', '#86efac', '#fbbf24', '#ef4444']
-const QUARTIL_LABELS = ['Baixo', 'Baixo/Médio', 'Médio/Elevado', 'Elevado']
+// 3 cores: verde = abaixo da média, laranja = ±10% da média, vermelho = acima da média
+const BAR_COLORS = { low: '#16a34a', mid: '#f97316', high: '#ef4444' }
+const BAR_LABELS = [
+  { color: BAR_COLORS.low, label: 'Abaixo da média' },
+  { color: BAR_COLORS.mid, label: '±10% da média' },
+  { color: BAR_COLORS.high, label: 'Acima da média' },
+]
 
-function getBarColor(total: number, q1: number, q2: number, q3: number): string {
-  if (total <= q1) return QUARTIL_COLORS[0]
-  if (total <= q2) return QUARTIL_COLORS[1]
-  if (total <= q3) return QUARTIL_COLORS[2]
-  return QUARTIL_COLORS[3]
+function getBarColor(total: number, mean: number): string {
+  if (total < mean * 0.90) return BAR_COLORS.low
+  if (total <= mean * 1.10) return BAR_COLORS.mid
+  return BAR_COLORS.high
 }
 
 const PERIOD_BG: Record<Period, string> = {
@@ -64,7 +67,7 @@ const CustomTooltip = ({ active, payload }: any) => {
       <div className="space-y-1">
         <div className="flex justify-between gap-4">
           <span className="text-gray-500">OMIE (mercado)</span>
-          <span className="font-medium tabular-nums text-gray-600 dark:text-gray-400">{d.omie.toFixed(2)} €/MWh</span>
+          <span className="font-medium tabular-nums text-gray-600 dark:text-gray-400">{d.omieKwh.toFixed(4)} €/kWh</span>
         </div>
         <div className="flex justify-between gap-4">
           <span className="text-gray-500">Custo final</span>
@@ -72,7 +75,7 @@ const CustomTooltip = ({ active, payload }: any) => {
         </div>
         <div className="flex justify-between gap-4 pt-1 border-t border-gray-100 dark:border-gray-700 text-[10px] text-gray-400">
           <span>TAR + margem + IVA</span>
-          <span className="tabular-nums">+{((d.total - d.omieKwh) * 1000).toFixed(1)} m€/kWh</span>
+          <span className="tabular-nums">+{(d.total - d.omieKwh).toFixed(4)} €/kWh</span>
         </div>
       </div>
       {d.isOptimal && (
@@ -141,11 +144,8 @@ export default function PriceChart({ prices, settings, date, isMock }: Props) {
   const data = buildSlotData(prices, settings, date, optimalHours)
   const periodBlocks = groupPeriodBlocks(data)
 
-  // Quartis para coloração das barras
-  const sorted = [...data.map(d => d.total)].sort((a, b) => a - b)
-  const q1 = sorted[Math.floor(sorted.length * 0.25)]
-  const q2 = sorted[Math.floor(sorted.length * 0.50)]
-  const q3 = sorted[Math.floor(sorted.length * 0.75)]
+  // Média do custo final para coloração das barras
+  const mean = data.reduce((s, d) => s + d.total, 0) / data.length
 
   const yMax = Math.max(...data.map(d => d.total)) * 1.08
   const hourTicks = Array.from({ length: 13 }, (_, i) => i * 8) // a cada 2h
@@ -225,12 +225,12 @@ export default function PriceChart({ prices, settings, date, isMock }: Props) {
             />
           )}
 
-          {/* Barras = preço OMIE bruto (€/kWh), coloridas pelo quartil do custo final */}
+          {/* Barras = preço OMIE bruto (€/kWh), coloridas pela relação com a média do dia */}
           <Bar dataKey="omieKwh" isAnimationActive={false} maxBarSize={8}>
             {data.map((entry, i) => (
               <Cell
                 key={i}
-                fill={getBarColor(entry.total, q1, q2, q3)}
+                fill={getBarColor(entry.total, mean)}
                 fillOpacity={entry.isOptimal ? 1 : 0.78}
               />
             ))}
@@ -269,10 +269,10 @@ export default function PriceChart({ prices, settings, date, isMock }: Props) {
 
       {/* Legenda */}
       <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 justify-center">
-        {QUARTIL_COLORS.map((color, i) => (
+        {BAR_LABELS.map((item, i) => (
           <span key={i} className="flex items-center gap-1 text-[10px] text-gray-500">
-            <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: color }} />
-            {QUARTIL_LABELS[i]}
+            <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: item.color }} />
+            {item.label}
           </span>
         ))}
         <span className="flex items-center gap-1 text-[10px] text-gray-500">
