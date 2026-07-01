@@ -205,14 +205,14 @@ export default function LoginPage() {
               <div className="text-center pt-2 border-t border-gray-100 dark:border-gray-800">
                 {mode === 'forgot' ? (
                   <button
-                    onClick={() => { setMode('login'); setError(null); setSuccess(null) }}
+                    onClick={() => { setMode('login'); setError(null); setSuccess(null); setShowPassword(false) }}
                     className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
                   >
                     Voltar ao login
                   </button>
                 ) : (
                   <button
-                    onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(null) }}
+                    onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(null); setShowPassword(false) }}
                     className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
                   >
                     {mode === 'login' ? 'Não tens conta? Regista-te' : 'Já tens conta? Entra'}

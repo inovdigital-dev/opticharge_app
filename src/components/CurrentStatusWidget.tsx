@@ -39,7 +39,7 @@ function CurrentStatusWidget({ prices, settings }: Props) {
   const goodUntil = goodUntilArr.length > 0 ? goodUntilArr[goodUntilArr.length - 1] : null
 
   const nextGoodStart = window && !isGoodNow
-    ? window.hours.find(h => h > currentHour) ?? window.startHour
+    ? (window.hours.find(h => h > currentHour) ?? null)
     : null
 
   return (
@@ -80,10 +80,14 @@ function CurrentStatusWidget({ prices, settings }: Props) {
             <p className="font-semibold text-gray-700 dark:text-gray-300 text-sm leading-tight">
               Não é boa hora para carregar
             </p>
-            {nextGoodStart !== null && (
+            {nextGoodStart !== null ? (
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                 Próximo período barato: {fmt(nextGoodStart)}
                 {window && ` – ${fmt(window.endHour)}`}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Sem período barato restante hoje
               </p>
             )}
           </>

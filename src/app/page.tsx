@@ -132,7 +132,7 @@ export default function Home() {
 
   const handleSignOut = async () => {
     await signOut()
-    setUser(null)
+    router.replace('/login')
   }
 
   const handleOnboardingDismiss = () => {

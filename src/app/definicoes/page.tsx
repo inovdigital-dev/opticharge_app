@@ -195,7 +195,7 @@ export default function Definicoes() {
                 {medios.map(o => <option key={o.id} value={o.name}>{o.name}</option>)}
               </optgroup>
             </select>
-            {currentOperator && (
+            {currentOperator && (currentOperator.company || currentOperator.type === 'media') && (
               <p className="text-xs text-gray-400">
                 {currentOperator.company}
                 {currentOperator.type === 'media' && ' · ⚠️ Tarifa média — otimização horária tem menor impacto na fatura'}
