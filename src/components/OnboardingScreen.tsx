@@ -78,7 +78,7 @@ export default function OnboardingScreen({ onDismiss }: Props) {
             onClick={handleSkip}
             className="w-full py-3 rounded-xl text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors min-h-[44px]"
           >
-            Explorar primeiro sem configurar
+            Explorar primeiro, configuro depois
           </button>
         </div>
 

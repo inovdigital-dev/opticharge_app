@@ -222,8 +222,7 @@ export default function LoginPage() {
             </div>
 
             <p className="text-center text-xs text-gray-400">
-              Podes usar sem conta — as definições ficam guardadas localmente.{' '}
-              <a href="/" className="text-blue-600 dark:text-blue-400 hover:underline">Continuar sem login</a>
+              Dados OMIE · Portugal · TAR 2026 ERSE
             </p>
           </div>
         </div>

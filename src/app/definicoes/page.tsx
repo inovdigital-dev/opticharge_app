@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { loadSettings, saveSettings } from '@/lib/settings'
+import { getUser } from '@/lib/supabase'
 import { TariffSettings, DEFAULT_SETTINGS, TariffOption, TAR_PRESETS, TARIFF_OPTION_LABELS, deriveTariffOption } from '@/lib/tariff'
 import { OPERATORS, getOperatorByName } from '@/lib/operators'
 import FormulaModal from '@/components/FormulaModal'
@@ -74,8 +76,16 @@ export default function Definicoes() {
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showFormula, setShowFormula] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
+  const router = useRouter()
 
-  useEffect(() => { loadSettings().then(setS) }, [])
+  useEffect(() => {
+    getUser().then(u => {
+      if (!u) { router.replace('/login'); return }
+      setAuthChecked(true)
+      loadSettings().then(setS)
+    })
+  }, [router])
 
   const update = (key: keyof TariffSettings, value: unknown) =>
     setS(prev => ({ ...prev, [key]: value }))
@@ -126,6 +136,8 @@ export default function Definicoes() {
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
+
+  if (!authChecked) return null
 
   const currentOperator = getOperatorByName(s.operator)
   const powerOptions = isHighPower(s.tariffOption) ? HIGH_POWER_OPTIONS : STD_POWER_OPTIONS

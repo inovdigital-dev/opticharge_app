@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { fetchOmiePrices, formatDate, getToday, getTomorrow, OmiePrice } from '@/lib/omie'
 import { loadSettings } from '@/lib/settings'
@@ -31,6 +32,7 @@ export default function Home() {
   const [tomorrowData, setTomorrowData] = useState<DayData>({ prices: [], isMock: false, source: '' })
   const [settings, setSettings] = useState<TariffSettings | null>(null)
   const [loading, setLoading] = useState(true)
+  const [authChecked, setAuthChecked] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [user, setUser] = useState<{ email?: string | null } | null>(null)
@@ -39,15 +41,21 @@ export default function Home() {
 
   const today = getToday()
   const tomorrow = getTomorrow()
+  const router = useRouter()
 
   useEffect(() => {
-    // Detectar primeira visita: sem settings guardadas e sem flag de boas-vindas
-    const welcomed = localStorage.getItem(ONBOARDING_KEY)
-    const hasSettings = localStorage.getItem('opticharge_settings')
-    if (!welcomed && !hasSettings) setShowOnboarding(true)
+    getUser().then(u => {
+      if (!u) { router.replace('/login'); return }
+      setUser({ email: u.email })
+      setAuthChecked(true)
 
-    loadSettings().then(setSettings)
-    getUser().then(u => setUser(u ? { email: u.email } : null))
+      // Detectar primeira visita: sem settings guardadas e sem flag de boas-vindas
+      const welcomed = localStorage.getItem(ONBOARDING_KEY)
+      const hasSettings = localStorage.getItem('opticharge_settings')
+      if (!welcomed && !hasSettings) setShowOnboarding(true)
+
+      loadSettings().then(setSettings)
+    })
   }, [])
 
   const load = async (force = false) => {
@@ -110,6 +118,8 @@ export default function Home() {
   // D+1 ainda não publicado (source = 'not-published-yet' e sem preços)
   const tomorrowNotPublished = tomorrowData.source === 'not-published-yet' && tomorrowData.prices.length === 0
   const dataUnavailable = activeData.isMock || activeData.source === 'not-published-yet'
+
+  if (!authChecked) return null
 
   if (showOnboarding) {
     return <OnboardingScreen onDismiss={handleOnboardingDismiss} />
