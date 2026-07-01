@@ -29,7 +29,6 @@ export interface TariffSettings {
   lossCoeff: number
   iva: number
   iespe: number
-  power: number
   tarVazio: number
   tarForaVazio: number
   tarPonta: number
@@ -81,7 +80,6 @@ export const DEFAULT_SETTINGS: TariffSettings = {
   lossCoeff: 0.03,
   iva: 0.23,
   iespe: 0.001,
-  power: 6.9,
   tarVazio: 0.0158,
   tarForaVazio: 0.0835,
   tarPonta: 0.2452,

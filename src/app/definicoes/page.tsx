@@ -64,9 +64,6 @@ function Toggle({ value, options, onChange }: {
 const dinamicos = OPERATORS.filter(o => o.type === 'quarto-horario')
 const medios = OPERATORS.filter(o => o.type === 'media')
 
-const HIGH_POWER_OPTIONS = [27.6, 34.5, 41.4]
-const STD_POWER_OPTIONS = [1.15, 2.3, 3.45, 4.6, 5.75, 6.9, 10.35, 13.8, 17.25, 20.7]
-
 const isHighPower = (opt: TariffOption) => opt === 'tri-high-diario' || opt === 'tri-high-semanal'
 const isTri = (opt: TariffOption) => opt.startsWith('tri')
 const isBi = (opt: TariffOption) => opt.startsWith('bi')
@@ -100,9 +97,6 @@ export default function Definicoes() {
       type,
       cycle,
       ...tar,
-      power: isHighPower(opt)
-        ? (HIGH_POWER_OPTIONS.includes(prev.power) ? prev.power : 27.6)
-        : (STD_POWER_OPTIONS.includes(prev.power) ? prev.power : 6.9),
     }))
   }
 
@@ -140,7 +134,6 @@ export default function Definicoes() {
   if (!authChecked) return null
 
   const currentOperator = getOperatorByName(s.operator)
-  const powerOptions = isHighPower(s.tariffOption) ? HIGH_POWER_OPTIONS : STD_POWER_OPTIONS
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -225,22 +218,9 @@ export default function Definicoes() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Margem total (€/kWh)" hint="Ajusta se diferente do teu contrato">
-              <NumInput value={s.margin} onChange={v => update('margin', v)} />
-            </Field>
-            <Field label="Potência (kVA)">
-              <select
-                value={s.power}
-                onChange={e => update('power', parseFloat(e.target.value))}
-                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {powerOptions.map(v => (
-                  <option key={v} value={v}>{v} kVA</option>
-                ))}
-              </select>
-            </Field>
-          </div>
+          <Field label="Margem total (€/kWh)" hint="Ajusta se diferente do teu contrato">
+            <NumInput value={s.margin} onChange={v => update('margin', v)} />
+          </Field>
         </div>
 
         {/* Opção Horária */}
