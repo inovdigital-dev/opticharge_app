@@ -141,7 +141,7 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Toast de preços disponíveis */}
       {toast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-4 py-2.5 rounded-2xl shadow-lg flex items-center gap-2 text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-4 py-2.5 rounded-2xl shadow-lg flex items-center gap-2 text-sm font-medium">
           <CheckCircle2 size={16} />
           {toast}
         </div>
