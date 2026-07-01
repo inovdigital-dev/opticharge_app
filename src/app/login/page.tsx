@@ -2,12 +2,12 @@
 
 import { useState, useId } from 'react'
 import { useRouter } from 'next/navigation'
-import { signIn, signUp } from '@/lib/supabase'
+import { signIn, signUp, resetPasswordForEmail } from '@/lib/supabase'
 import Logo from '@/components/Logo'
 import { Mail, Lock, Loader2, Eye, EyeOff, Zap } from 'lucide-react'
 
 export default function LoginPage() {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -30,11 +30,15 @@ export default function LoginPage() {
         const { error } = await signIn(email, password)
         if (error) throw error
         router.push('/')
-      } else {
+      } else if (mode === 'register') {
         const { error } = await signUp(email, password)
         if (error) throw error
-        setSuccess('Conta criada! Confirma o email e faz login.')
+        setSuccess('Conta criada! Podes fazer login agora.')
         setMode('login')
+      } else {
+        const { error } = await resetPasswordForEmail(email, `${window.location.origin}/reset-password`)
+        if (error) throw error
+        setSuccess('Enviámos um link para o teu email. Verifica a caixa de entrada.')
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro desconhecido'
@@ -96,10 +100,10 @@ export default function LoginPage() {
             {/* Mode heading — desktop only */}
             <div className="hidden md:block text-center">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {mode === 'login' ? 'Bem-vindo de volta' : 'Criar conta gratuita'}
+                {mode === 'login' ? 'Bem-vindo de volta' : mode === 'register' ? 'Criar conta gratuita' : 'Recuperar password'}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                {mode === 'login' ? 'Entra na tua conta OptiCharge' : 'Começa a otimizar o carregamento do teu EV'}
+                {mode === 'login' ? 'Entra na tua conta OptiCharge' : mode === 'register' ? 'Começa a otimizar o carregamento do teu EV' : 'Envia um link de recuperação para o teu email'}
               </p>
             </div>
 
@@ -144,47 +148,48 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Password */}
-                <div className="space-y-1">
-                  <label htmlFor={passwordId} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                    <input
-                      id={passwordId}
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      required
-                      minLength={6}
-                      autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                      className="w-full pl-9 pr-10 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(v => !v)}
-                      aria-label={showPassword ? 'Ocultar password' : 'Mostrar password'}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                    >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-
-                  {/* Forgot password — login mode only */}
-                  {mode === 'login' && (
-                    <div className="text-right">
+                {/* Password — not shown in forgot mode */}
+                {mode !== 'forgot' && (
+                  <div className="space-y-1">
+                    <label htmlFor={passwordId} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                      <input
+                        id={passwordId}
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        required
+                        minLength={6}
+                        autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                        className="w-full pl-9 pr-10 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px]"
+                      />
                       <button
                         type="button"
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                        onClick={() => {/* placeholder */}}
+                        onClick={() => setShowPassword(v => !v)}
+                        aria-label={showPassword ? 'Ocultar password' : 'Mostrar password'}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
                       >
-                        Esqueceu a password?
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </div>
-                  )}
-                </div>
+
+                    {mode === 'login' && (
+                      <div className="text-right">
+                        <button
+                          type="button"
+                          className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                          onClick={() => { setMode('forgot'); setError(null); setSuccess(null) }}
+                        >
+                          Esqueceu a password?
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Submit */}
                 <button
@@ -192,21 +197,27 @@ export default function LoginPage() {
                   disabled={loading}
                   className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-60 min-h-[48px]"
                 >
-                  {loading
-                    ? <Loader2 size={15} className="animate-spin" />
-                    : <Zap size={16} />
-                  }
-                  {mode === 'login' ? 'Entrar' : 'Criar conta'}
+                  {loading ? <Loader2 size={15} className="animate-spin" /> : <Zap size={16} />}
+                  {mode === 'login' ? 'Entrar' : mode === 'register' ? 'Criar conta' : 'Enviar link de recuperação'}
                 </button>
               </form>
 
               <div className="text-center pt-2 border-t border-gray-100 dark:border-gray-800">
-                <button
-                  onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(null) }}
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  {mode === 'login' ? 'Não tens conta? Regista-te' : 'Já tens conta? Entra'}
-                </button>
+                {mode === 'forgot' ? (
+                  <button
+                    onClick={() => { setMode('login'); setError(null); setSuccess(null) }}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    Voltar ao login
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(null) }}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {mode === 'login' ? 'Não tens conta? Regista-te' : 'Já tens conta? Entra'}
+                  </button>
+                )}
               </div>
             </div>
 

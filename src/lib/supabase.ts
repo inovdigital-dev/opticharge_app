@@ -88,3 +88,15 @@ export async function getUser() {
   const { data: { user } } = await sb.auth.getUser()
   return user
 }
+
+export async function resetPasswordForEmail(email: string, redirectTo: string) {
+  const sb = getClient()
+  if (!sb) throw new Error('Supabase não configurado')
+  return sb.auth.resetPasswordForEmail(email, { redirectTo })
+}
+
+export async function updatePassword(password: string) {
+  const sb = getClient()
+  if (!sb) throw new Error('Supabase não configurado')
+  return sb.auth.updateUser({ password })
+}
