@@ -49,12 +49,14 @@ export default function Home() {
       setUser({ email: u.email })
       setAuthChecked(true)
 
-      // Detectar primeira visita: sem settings guardadas e sem flag de boas-vindas
-      const welcomed = localStorage.getItem(ONBOARDING_KEY)
-      const hasSettings = localStorage.getItem('opticharge_settings')
-      if (!welcomed && !hasSettings) setShowOnboarding(true)
-
-      loadSettings().then(setSettings)
+      // Carregar settings primeiro (guarda no localStorage se vierem do Supabase)
+      loadSettings().then(s => {
+        setSettings(s)
+        // Só mostrar onboarding se não tiver flag E não tiver settings guardadas
+        const welcomed = localStorage.getItem(ONBOARDING_KEY)
+        const hasSettings = localStorage.getItem('opticharge_settings')
+        if (!welcomed && !hasSettings) setShowOnboarding(true)
+      })
     })
   }, [])
 
