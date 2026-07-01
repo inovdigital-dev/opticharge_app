@@ -11,10 +11,13 @@ import RecommendationBox from '@/components/RecommendationBox'
 import CurrentStatusWidget from '@/components/CurrentStatusWidget'
 import BottomNav from '@/components/BottomNav'
 import Logo from '@/components/Logo'
+import OnboardingScreen from '@/components/OnboardingScreen'
 import Link from 'next/link'
 import { Settings, RefreshCw, LogIn, LogOut, Clock } from 'lucide-react'
 
 const PriceChart = dynamic(() => import('@/components/PriceChart'), { ssr: false })
+
+const ONBOARDING_KEY = 'opticharge_welcomed'
 
 interface DayData {
   prices: OmiePrice[]
@@ -28,6 +31,7 @@ export default function Home() {
   const [tomorrowData, setTomorrowData] = useState<DayData>({ prices: [], isMock: false, source: '' })
   const [settings, setSettings] = useState<TariffSettings | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showOnboarding, setShowOnboarding] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [user, setUser] = useState<{ email?: string | null } | null>(null)
   const [showIVA, setShowIVA] = useState(true)
@@ -37,6 +41,11 @@ export default function Home() {
   const tomorrow = getTomorrow()
 
   useEffect(() => {
+    // Detectar primeira visita: sem settings guardadas e sem flag de boas-vindas
+    const welcomed = localStorage.getItem(ONBOARDING_KEY)
+    const hasSettings = localStorage.getItem('opticharge_settings')
+    if (!welcomed && !hasSettings) setShowOnboarding(true)
+
     loadSettings().then(setSettings)
     getUser().then(u => setUser(u ? { email: u.email } : null))
   }, [])
@@ -93,9 +102,18 @@ export default function Home() {
     setUser(null)
   }
 
+  const handleOnboardingDismiss = () => {
+    localStorage.setItem(ONBOARDING_KEY, 'true')
+    setShowOnboarding(false)
+  }
+
   // D+1 ainda não publicado (source = 'not-published-yet' e sem preços)
   const tomorrowNotPublished = tomorrowData.source === 'not-published-yet' && tomorrowData.prices.length === 0
   const dataUnavailable = activeData.isMock || activeData.source === 'not-published-yet'
+
+  if (showOnboarding) {
+    return <OnboardingScreen onDismiss={handleOnboardingDismiss} />
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
