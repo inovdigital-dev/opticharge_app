@@ -1,16 +1,20 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { fetchOmiePrices, formatDate, getToday, getTomorrow, OmiePrice } from '@/lib/omie'
 import { loadSettings } from '@/lib/settings'
 import { TariffSettings, TARIFF_OPTION_LABELS } from '@/lib/tariff'
 import { getUser, signOut } from '@/lib/supabase'
-import PriceChart from '@/components/PriceChart'
+import { SkeletonChart, SkeletonStatus, SkeletonRecommendation } from '@/components/Skeleton'
 import RecommendationBox from '@/components/RecommendationBox'
 import CurrentStatusWidget from '@/components/CurrentStatusWidget'
+import BottomNav from '@/components/BottomNav'
 import Logo from '@/components/Logo'
 import Link from 'next/link'
 import { Settings, RefreshCw, LogIn, LogOut, Clock } from 'lucide-react'
+
+const PriceChart = dynamic(() => import('@/components/PriceChart'), { ssr: false })
 
 interface DayData {
   prices: OmiePrice[]
@@ -103,19 +107,33 @@ export default function Home() {
             <button
               onClick={() => load()}
               disabled={loading}
-              className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Atualizar preços"
+              className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             >
               <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
             </button>
-            <Link href="/definicoes" className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <Link
+              href="/definicoes"
+              aria-label="Definições"
+              className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
               <Settings size={17} />
             </Link>
             {user ? (
-              <button onClick={handleSignOut} className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title={user.email ?? ''}>
+              <button
+                onClick={handleSignOut}
+                aria-label="Terminar sessão"
+                className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                title={user.email ?? ''}
+              >
                 <LogOut size={17} />
               </button>
             ) : (
-              <Link href="/login" className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+              <Link
+                href="/login"
+                aria-label="Iniciar sessão"
+                className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
                 <LogIn size={17} />
               </Link>
             )}
@@ -123,7 +141,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 py-4 space-y-4 pb-8">
+      <main id="main-content" className="max-w-lg mx-auto px-4 py-4 space-y-4 has-bottom-nav">
         {/* Widget estado atual (só no tab Hoje) */}
         {activeDay === 'hoje' && !loading && effectiveSettings && todayData.prices.length > 0 && (
           <CurrentStatusWidget prices={todayData.prices} settings={effectiveSettings} />
@@ -157,14 +175,11 @@ export default function Home() {
 
         {/* Gráfico / Mensagem indisponibilidade */}
         {loading ? (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
-            <div className="h-48 flex items-center justify-center">
-              <div className="flex flex-col items-center gap-2 text-gray-400">
-                <RefreshCw size={22} className="animate-spin" />
-                <span className="text-xs">A carregar preços OMIE...</span>
-              </div>
-            </div>
-          </div>
+          <>
+            {activeDay === 'hoje' && <SkeletonStatus />}
+            <SkeletonChart />
+            <SkeletonRecommendation />
+          </>
         ) : dataUnavailable ? (
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-8 flex flex-col items-center text-center gap-5">
             <div className="w-16 h-16 bg-amber-50 dark:bg-amber-950 rounded-2xl flex items-center justify-center">
@@ -218,9 +233,11 @@ export default function Home() {
                 <div className="flex flex-col items-end gap-1.5">
                   {/* Toggle IVA */}
                   <button
+                    role="switch"
+                    aria-checked={showIVA}
                     onClick={() => setShowIVA(v => !v)}
                     className="flex items-center gap-1.5 group"
-                    aria-label="Incluir IVA nos preços"
+                    aria-label={`IVA 23% ${showIVA ? 'incluído' : 'excluído'}`}
                   >
                     <span className={`text-[10px] font-medium transition-colors ${showIVA ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}`}>
                       {showIVA ? 'c/ IVA 23%' : 's/ IVA'}
@@ -251,38 +268,26 @@ export default function Home() {
           </>
         )}
 
-        {/* Info tarifário */}
-        {settings && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Tarifário ativo</h3>
-              <Link href="/definicoes" className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Editar</Link>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5">
-                <div className="text-xs text-gray-400 mb-0.5">Operador</div>
-                <div className="font-medium text-gray-800 dark:text-gray-200 text-xs leading-tight">{settings.operator}</div>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5">
-                <div className="text-xs text-gray-400 mb-0.5">Opção horária</div>
-                <div className="font-medium text-gray-800 dark:text-gray-200 text-xs">{TARIFF_OPTION_LABELS[settings.tariffOption] ?? settings.tariffOption}</div>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5">
-                <div className="text-xs text-gray-400 mb-0.5">TAR Vazio</div>
-                <div className="font-medium text-green-600 text-xs">{settings.tarVazio.toFixed(4)} €/kWh</div>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5">
-                <div className="text-xs text-gray-400 mb-0.5">TAR Fora Vazio</div>
-                <div className="font-medium text-orange-600 text-xs">{settings.tarForaVazio.toFixed(4)} €/kWh</div>
-              </div>
-            </div>
-          </div>
+        {/* Info tarifário — compact chip */}
+        {settings && !loading && (
+          <Link
+            href="/definicoes"
+            className="flex items-center justify-between bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 px-3 py-2.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            <span className="font-medium text-gray-700 dark:text-gray-300">{settings.operator}</span>
+            <span className="flex items-center gap-1.5">
+              <span>{TARIFF_OPTION_LABELS[settings.tariffOption]}</span>
+              <Settings size={12} />
+            </span>
+          </Link>
         )}
 
-        <p className="text-center text-xs text-gray-400">
+        <p className="text-center text-xs text-gray-400 pb-2">
           Preços OMIE · Portugal · TAR 2026 ERSE
         </p>
       </main>
+
+      <BottomNav />
     </div>
   )
 }

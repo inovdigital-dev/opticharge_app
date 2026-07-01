@@ -3,6 +3,8 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --oc-primary: #2563eb;
+  --oc-accent: #16a34a;
 }
 
 @theme inline {
@@ -16,11 +18,73 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --oc-primary: #3b82f6;
+    --oc-accent: #22c55e;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Skip to content link — accessibility */
+.skip-link {
+  position: absolute;
+  top: -999px;
+  left: -999px;
+  z-index: 9999;
+  padding: 0.5rem 1rem;
+  background: var(--oc-primary);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 0 0 0.5rem 0;
+  text-decoration: none;
+  transition: top 0.1s;
+}
+.skip-link:focus {
+  top: 0;
+  left: 0;
+}
+
+/* Global focus-visible outline using brand color */
+:focus-visible {
+  outline: 2px solid var(--oc-primary);
+  outline-offset: 2px;
+}
+
+/* Skeleton shimmer animation */
+@keyframes skeleton-shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #e5e7eb 25%,
+    #f3f4f6 50%,
+    #e5e7eb 75%
+  );
+  background-size: 800px 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-color-scheme: dark) {
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      #374151 25%,
+      #4b5563 50%,
+      #374151 75%
+    );
+    background-size: 800px 100%;
+  }
+}
+
+/* Bottom nav padding utility */
+.has-bottom-nav {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom));
 }

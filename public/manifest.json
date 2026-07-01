@@ -1,0 +1,16 @@
+{
+  "name": "OptiCharge",
+  "short_name": "OptiCharge",
+  "description": "Preços OMIE em tempo real para otimizares o carregamento do teu EV",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1120",
+  "theme_color": "#2563eb",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["utilities", "finance"],
+  "lang": "pt"
+}

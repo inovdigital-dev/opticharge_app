@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { OmiePrice } from '@/lib/omie'
 import { TariffSettings, calcPrice, getPeriodForHour, findOptimalWindow, getPeriodLabel, TARIFF_OPTION_LABELS } from '@/lib/tariff'
 import { Zap, TrendingDown, AlertTriangle, Clock, Info, X } from 'lucide-react'
@@ -68,7 +68,7 @@ function buildExplanation(
   return `Período ${windowPeriodLabel} (${fmt(window.startHour)}–${fmt(window.endHour)}): preço OMIE médio de ${avgOmie.toFixed(2)} €/MWh, resultando num custo total de ${window.avgPrice.toFixed(4)} €/kWh com TAR + margem${ivaStr} incluídos. Poupança estimada por carregamento (~22 kWh): ~${savings}€ vs. pior horário.`
 }
 
-export default function RecommendationBox({ prices, settings, date, label }: Props) {
+function RecommendationBox({ prices, settings, date, label }: Props) {
   const [showInfo, setShowInfo] = useState(false)
 
   if (!prices.length) return null
@@ -187,3 +187,5 @@ export default function RecommendationBox({ prices, settings, date, label }: Pro
     </div>
   )
 }
+
+export default memo(RecommendationBox)

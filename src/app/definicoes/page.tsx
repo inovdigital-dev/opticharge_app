@@ -5,6 +5,7 @@ import { loadSettings, saveSettings } from '@/lib/settings'
 import { TariffSettings, DEFAULT_SETTINGS, TariffOption, TAR_PRESETS, TARIFF_OPTION_LABELS, deriveTariffOption } from '@/lib/tariff'
 import { OPERATORS, getOperatorByName } from '@/lib/operators'
 import FormulaModal from '@/components/FormulaModal'
+import BottomNav from '@/components/BottomNav'
 import Logo from '@/components/Logo'
 import Link from 'next/link'
 import { ArrowLeft, Save, RotateCcw, Info } from 'lucide-react'
@@ -142,7 +143,7 @@ export default function Definicoes() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 min-h-[44px] rounded-xl text-sm font-medium transition-all ${
               saved
                 ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
                 : 'bg-blue-600 text-white hover:bg-blue-700'
@@ -154,7 +155,7 @@ export default function Definicoes() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 py-4 space-y-4 pb-8">
+      <main id="main-content" className="max-w-lg mx-auto px-4 py-4 space-y-4 has-bottom-nav">
 
 
         {/* Operador */}
@@ -169,6 +170,7 @@ export default function Definicoes() {
               {currentOperator && (
                 <button
                   onClick={() => setShowFormula(true)}
+                  aria-label="Ver fórmula de cálculo do operador"
                   className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors py-1 px-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950"
                 >
                   <Info size={13} />
@@ -301,6 +303,7 @@ export default function Definicoes() {
             </div>
             <button
               onClick={() => setS(prev => ({ ...prev, ...TAR_PRESETS[prev.tariffOption] }))}
+              aria-label="Repor valores TAR predefinidos"
               className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
             >
               <RotateCcw size={11} /> Repor
@@ -362,6 +365,8 @@ export default function Definicoes() {
           onClose={() => setShowFormula(false)}
         />
       )}
+
+      <BottomNav />
     </div>
   )
 }

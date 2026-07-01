@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { OmiePrice } from '@/lib/omie'
 import { TariffSettings, calcPrice, getPeriodForHour, findOptimalWindow } from '@/lib/tariff'
 import { Zap, ZapOff, Clock } from 'lucide-react'
@@ -13,7 +14,7 @@ function fmt(h: number) {
   return `${String(h).padStart(2, '0')}:00`
 }
 
-export default function CurrentStatusWidget({ prices, settings }: Props) {
+function CurrentStatusWidget({ prices, settings }: Props) {
   if (!prices.length) return null
 
   const now = new Date()
@@ -70,7 +71,7 @@ export default function CurrentStatusWidget({ prices, settings }: Props) {
             {goodUntil !== null && (
               <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">
                 Aproveita até às {fmt(goodUntil + 1)}
-                {currentTotal && ` · ${currentTotal.toFixed(4)} €/kWh`}
+                {currentTotal && ` · ${currentTotal.toFixed(2)} €/kWh`}
               </p>
             )}
           </>
@@ -92,7 +93,7 @@ export default function CurrentStatusWidget({ prices, settings }: Props) {
       {currentTotal && (
         <div className="text-right shrink-0">
           <div className={`text-lg font-bold ${isGoodNow ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-gray-400'}`}>
-            {currentTotal.toFixed(4)}
+            {currentTotal.toFixed(2)}
           </div>
           <div className="text-xs text-gray-400">€/kWh</div>
         </div>
@@ -100,3 +101,5 @@ export default function CurrentStatusWidget({ prices, settings }: Props) {
     </div>
   )
 }
+
+export default React.memo(CurrentStatusWidget)

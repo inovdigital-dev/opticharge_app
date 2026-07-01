@@ -1,3 +1,7 @@
+'use client'
+
+import { useId } from 'react'
+
 interface LogoProps {
   size?: number
   className?: string
@@ -5,6 +9,9 @@ interface LogoProps {
 }
 
 export default function Logo({ size = 32, className = '', showText = true }: LogoProps) {
+  const uid = useId()
+  const gradId = `oc-grad-${uid.replace(/:/g, '')}`
+
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <svg
@@ -16,7 +23,7 @@ export default function Logo({ size = 32, className = '', showText = true }: Log
         aria-label="OptiCharge logo"
       >
         {/* Fundo hexagonal arredondado */}
-        <rect width="40" height="40" rx="10" fill="url(#grad)" />
+        <rect width="40" height="40" rx="10" fill={`url(#${gradId})`} />
         {/* Raio principal */}
         <path
           d="M23 6L13 22h8l-4 12 14-18h-8.5L23 6z"
@@ -27,7 +34,7 @@ export default function Logo({ size = 32, className = '', showText = true }: Log
         <circle cx="29" cy="28" r="3.5" fill="white" fillOpacity="0.4" />
         <circle cx="29" cy="28" r="2" fill="white" fillOpacity="0.9" />
         <defs>
-          <linearGradient id="grad" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+          <linearGradient id={gradId} x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
             <stop offset="0%" stopColor="#2563EB" />
             <stop offset="100%" stopColor="#16a34a" />
           </linearGradient>
