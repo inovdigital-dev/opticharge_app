@@ -40,33 +40,44 @@ async function fetchFromOmie(date: string, country: string, force = false): Prom
   const [year, month, day] = date.split('-')
   const dateFormatted = `${day}${month}${year}`
 
+  const browserHeaders = {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'pt-PT,pt;q=0.9,en;q=0.8',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Referer': 'https://www.omie.es/pt/market-results/daily/daily-market/daily-negotiation/?scope=daily&nMonths=1',
+  }
+
   // Tentativa 1: ficheiro do mercado diário (mais fiável)
   const fileUrl = `https://www.omie.es/pt/file-download?parents%5B%5D=marginalpdbc&filename=marginalpdbc_${year}${month}${day}.1`
   try {
     const res = await fetch(fileUrl, {
-      headers: { 'Accept': 'text/plain, */*' },
+      headers: browserHeaders,
       ...(force ? { cache: 'no-store' } : { next: { revalidate: 3600 } }),
     })
+    console.log(`OMIE file [${date}]: status=${res.status}`)
     if (res.ok) {
       const text = await res.text()
       const prices = parseOmieFile(text, date, country)
+      console.log(`OMIE file [${date}]: parsed ${prices.length} horas`)
       if (prices.length >= 20) return { prices, isMock: false, source: 'omie-file' }
     }
-  } catch { /* fallthrough */ }
+  } catch (e) { console.error(`OMIE file [${date}] erro:`, e) }
 
   // Tentativa 2: API REST OMIE
   const apiUrl = `https://api.omie.es/api/v1/market-results/portugal/dam/?year=${year}&month=${month}&day=${day}&json=true`
   try {
     const res = await fetch(apiUrl, {
-      headers: { Accept: 'application/json' },
-      next: { revalidate: 3600 },
+      headers: { ...browserHeaders, Accept: 'application/json' },
+      ...(force ? { cache: 'no-store' } : { next: { revalidate: 3600 } }),
     })
+    console.log(`OMIE API [${date}]: status=${res.status}`)
     if (res.ok) {
       const data = await res.json()
       const prices = parseOmieApi(data, date)
+      console.log(`OMIE API [${date}]: parsed ${prices.length} horas`)
       if (prices.length >= 20) return { prices, isMock: false, source: 'omie-api' }
     }
-  } catch { /* fallthrough */ }
+  } catch (e) { console.error(`OMIE API [${date}] erro:`, e) }
 
   // Verificar se D+1 ainda não foi publicado (OMIE publica ~11:30-12:30 UTC = ~12:30-13:30 PT)
   // D+1 = amanhã em UTC. Só bloqueamos se for D+2 ou além, ou se for D+1 mas antes das 13h UTC.
