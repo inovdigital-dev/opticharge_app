@@ -68,14 +68,30 @@ async function fetchFromOmie(date: string, country: string, force = false): Prom
     }
   } catch { /* fallthrough */ }
 
-  // Verificar se D+1 ainda não foi publicado (OMIE publica ~11:30 UTC)
-  // Se date > todayUTC → definitivamente não publicado (é amanhã ou além no UTC)
-  // Se date === todayUTC mas hour < 13 → pode ainda não ter sido publicado
+  // Verificar se D+1 ainda não foi publicado (OMIE publica ~11:30-12:30 UTC = ~12:30-13:30 PT)
+  // D+1 = amanhã em UTC. Só bloqueamos se for D+2 ou além, ou se for D+1 mas antes das 13h UTC.
   const nowUTC = new Date()
   const todayUTCStr = nowUTC.toISOString().split('T')[0]
+  const tomorrowUTC = new Date(nowUTC)
+  tomorrowUTC.setUTCDate(tomorrowUTC.getUTCDate() + 1)
+  const tomorrowUTCStr = tomorrowUTC.toISOString().split('T')[0]
   const hourUTC = nowUTC.getUTCHours()
-  if (date > todayUTCStr || (date === todayUTCStr && hourUTC < 13)) {
-    console.warn(`OMIE: preços (${date}) ainda não publicados (UTC now: ${todayUTCStr} ${hourUTC}h)`)
+
+  // D+2 ou além: definitivamente não publicado
+  if (date > tomorrowUTCStr) {
+    console.warn(`OMIE: preços (${date}) muito à frente, não publicados`)
+    void dateFormatted
+    return { prices: [], isMock: false, source: 'not-published-yet' }
+  }
+  // D+1 mas antes das 13h UTC: OMIE ainda não publicou
+  if (date === tomorrowUTCStr && hourUTC < 13) {
+    console.warn(`OMIE: preços D+1 (${date}) ainda não publicados (UTC: ${hourUTC}h)`)
+    void dateFormatted
+    return { prices: [], isMock: false, source: 'not-published-yet' }
+  }
+  // D hoje mas antes das 13h UTC (arranque de dia): improvável mas defensivo
+  if (date === todayUTCStr && hourUTC < 13) {
+    console.warn(`OMIE: preços de hoje (${date}) antes das 13h UTC`)
     void dateFormatted
     return { prices: [], isMock: false, source: 'not-published-yet' }
   }

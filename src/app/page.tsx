@@ -225,7 +225,7 @@ export default function Home() {
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-300 max-w-xs">
                   A OMIE publica os preços do dia seguinte normalmente entre as{' '}
-                  <strong>12h30</strong> e as <strong>13h30</strong>.
+                  <strong>13h00</strong> e as <strong>14h30</strong>.
                 </p>
                 <p className="text-xs text-gray-400">
                   A app verificará automaticamente e atualizará quando os preços estiverem disponíveis.
