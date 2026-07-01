@@ -20,18 +20,38 @@ export default function ResetPasswordPage() {
   const confirmId = useId()
 
   useEffect(() => {
-    // O Supabase client deteta automaticamente o access_token no URL hash e estabelece a sessão
     const sb = getClient()
     if (!sb) { setChecking(false); return }
 
-    // Dar tempo ao cliente para processar o hash
-    const timer = setTimeout(async () => {
-      const { data: { session } } = await sb.auth.getSession()
-      setHasSession(!!session)
+    let settled = false
+    const settle = (hasS: boolean) => {
+      if (settled) return
+      settled = true
+      setHasSession(hasS)
       setChecking(false)
-    }, 500)
+    }
 
-    return () => clearTimeout(timer)
+    // Ouvir eventos de auth — PASSWORD_RECOVERY ou SIGNED_IN confirmam sessão válida
+    const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+        settle(!!session)
+      } else if (event === 'SIGNED_OUT') {
+        settle(false)
+      }
+    })
+
+    // Verificar sessão já existente (caso o evento já tenha disparado)
+    sb.auth.getSession().then(({ data: { session } }) => {
+      if (session) settle(true)
+    })
+
+    // Timeout de segurança: se após 3s ainda não tiver sessão, mostrar erro
+    const timer = setTimeout(() => settle(false), 3000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timer)
+    }
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {

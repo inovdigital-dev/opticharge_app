@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 import { fetchOmiePrices, formatDate, getToday, getTomorrow, OmiePrice } from '@/lib/omie'
 import { loadSettings } from '@/lib/settings'
 import { TariffSettings, TARIFF_OPTION_LABELS } from '@/lib/tariff'
-import { getUser, signOut } from '@/lib/supabase'
+import { getClient, getUser, signOut } from '@/lib/supabase'
 import { SkeletonChart, SkeletonStatus, SkeletonRecommendation } from '@/components/Skeleton'
 import RecommendationBox from '@/components/RecommendationBox'
 import CurrentStatusWidget from '@/components/CurrentStatusWidget'
@@ -45,20 +45,33 @@ export default function Home() {
   const router = useRouter()
 
   useEffect(() => {
+    const sb = getClient()
+    if (!sb) { router.replace('/login'); return }
+
+    // Se o utilizador chegou via link de recuperação de password, redirecionar para a página correta
+    let isRecovery = false
+    const { data: { subscription } } = sb.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        isRecovery = true
+        router.replace('/reset-password')
+      }
+    })
+
     getUser().then(u => {
+      if (isRecovery) return
       if (!u) { router.replace('/login'); return }
       setUser({ email: u.email })
       setAuthChecked(true)
 
-      // Carregar settings primeiro (guarda no localStorage se vierem do Supabase)
       loadSettings().then(s => {
         setSettings(s)
-        // Só mostrar onboarding se não tiver flag E não tiver settings guardadas
         const welcomed = localStorage.getItem(ONBOARDING_KEY)
         const hasSettings = localStorage.getItem('opticharge_settings')
         if (!welcomed && !hasSettings) setShowOnboarding(true)
       })
     })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   const load = async (force = false) => {
