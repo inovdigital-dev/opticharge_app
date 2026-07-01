@@ -14,7 +14,7 @@ import BottomNav from '@/components/BottomNav'
 import Logo from '@/components/Logo'
 import OnboardingScreen from '@/components/OnboardingScreen'
 import Link from 'next/link'
-import { Settings, RefreshCw, LogIn, LogOut, Clock } from 'lucide-react'
+import { Settings, RefreshCw, LogIn, LogOut, Clock, CheckCircle2 } from 'lucide-react'
 
 const PriceChart = dynamic(() => import('@/components/PriceChart'), { ssr: false })
 
@@ -38,6 +38,7 @@ export default function Home() {
   const [user, setUser] = useState<{ email?: string | null } | null>(null)
   const [showIVA, setShowIVA] = useState(true)
   const [loadedDate, setLoadedDate] = useState('')
+  const [toast, setToast] = useState<string | null>(null)
 
   const today = getToday()
   const tomorrow = getTomorrow()
@@ -61,7 +62,6 @@ export default function Home() {
   }, [])
 
   const load = async (force = false) => {
-    // Usa datas frescas em cada chamada (não captura da closure inicial)
     const t0 = getToday()
     const t1 = getTomorrow()
     setLoading(true)
@@ -71,11 +71,21 @@ export default function Home() {
         fetchOmiePrices(formatDate(t1), force),
       ])
       setTodayData(t)
-      setTomorrowData(tm)
+      setTomorrowData(prev => {
+        // Detectar quando D+1 passa de indisponível para disponível
+        const wasUnavailable = prev.source === 'not-published-yet' && prev.prices.length === 0
+        const nowAvailable = tm.prices.length > 0
+        if (wasUnavailable && nowAvailable) {
+          setToast('Preços de amanhã disponíveis!')
+          setActiveDay('amanha')
+          setTimeout(() => setToast(null), 4000)
+        }
+        return tm
+      })
       setLastUpdated(new Date())
       setLoadedDate(formatDate(t0))
     } catch {
-      // Se falhar completamente, manter dados anteriores (se existirem)
+      // manter dados anteriores se existirem
     } finally {
       setLoading(false)
     }
@@ -129,6 +139,13 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      {/* Toast de preços disponíveis */}
+      {toast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-4 py-2.5 rounded-2xl shadow-lg flex items-center gap-2 text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300">
+          <CheckCircle2 size={16} />
+          {toast}
+        </div>
+      )}
       {/* Header */}
       <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
@@ -211,47 +228,15 @@ export default function Home() {
             <SkeletonRecommendation />
           </>
         ) : dataUnavailable ? (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-8 flex flex-col items-center text-center gap-5">
-            <div className="w-16 h-16 bg-amber-50 dark:bg-amber-950 rounded-2xl flex items-center justify-center">
-              <Clock size={32} className="text-amber-400" />
-            </div>
-            {activeData.source === 'not-published-yet' ? (
-              <>
-                <div className="space-y-1">
-                  <h2 className="font-bold text-gray-900 dark:text-white">
-                    Preços de {dayLabel.toLowerCase()} ainda não publicados
-                  </h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">{fmtDate(date)}</p>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-300 max-w-xs">
-                  A OMIE publica os preços do dia seguinte normalmente entre as{' '}
-                  <strong>13h00</strong> e as <strong>14h30</strong>.
-                </p>
-                <p className="text-xs text-gray-400">
-                  A app verificará automaticamente e atualizará quando os preços estiverem disponíveis.
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="space-y-1">
-                  <h2 className="font-bold text-gray-900 dark:text-white">
-                    Preços reais não disponíveis
-                  </h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">{fmtDate(date)}</p>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-300 max-w-xs">
-                  Não foi possível obter dados OMIE reais no momento.
-                </p>
-              </>
-            )}
-            <button
-              onClick={() => load(true)}
-              className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
-            >
-              <RefreshCw size={14} />
-              Verificar agora
-            </button>
-          </div>
+          <UnavailableCard
+            source={activeData.source}
+            dayLabel={dayLabel}
+            date={date}
+            lastUpdated={lastUpdated}
+            loading={loading}
+            onRefresh={() => load(true)}
+            fmtDate={fmtDate}
+          />
         ) : (
           <>
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
@@ -318,6 +303,77 @@ export default function Home() {
       </main>
 
       <BottomNav />
+    </div>
+  )
+}
+
+function UnavailableCard({
+  source, dayLabel, date, lastUpdated, loading, onRefresh, fmtDate,
+}: {
+  source: string
+  dayLabel: string
+  date: Date
+  lastUpdated: Date | null
+  loading: boolean
+  onRefresh: () => void
+  fmtDate: (d: Date) => string
+}) {
+  const now = new Date()
+  const ptHour = now.getHours()
+  const ptMin = now.getMinutes()
+  const isPastPublishWindow = ptHour > 14 || (ptHour === 14 && ptMin >= 30)
+  const isNotPublishedYet = source === 'not-published-yet'
+
+  const fmtTime = (d: Date) =>
+    d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-8 flex flex-col items-center text-center gap-4">
+      <div className="w-14 h-14 bg-amber-50 dark:bg-amber-950 rounded-2xl flex items-center justify-center">
+        <Clock size={28} className="text-amber-400" />
+      </div>
+
+      <div className="space-y-1">
+        <h2 className="font-bold text-gray-900 dark:text-white">
+          {isNotPublishedYet
+            ? `Preços de ${dayLabel.toLowerCase()} indisponíveis`
+            : 'Preços reais não disponíveis'}
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">{fmtDate(date)}</p>
+      </div>
+
+      {isNotPublishedYet ? (
+        isPastPublishWindow ? (
+          <p className="text-sm text-gray-600 dark:text-gray-300 max-w-xs">
+            A OMIE ainda não publicou os preços para este dia.
+            Pode estar com atraso — a app está a verificar automaticamente.
+          </p>
+        ) : (
+          <p className="text-sm text-gray-600 dark:text-gray-300 max-w-xs">
+            A OMIE publica os preços do dia seguinte normalmente entre as{' '}
+            <strong>13h30</strong> e as <strong>14h30</strong>.
+          </p>
+        )
+      ) : (
+        <p className="text-sm text-gray-600 dark:text-gray-300 max-w-xs">
+          Não foi possível obter dados de preços no momento.
+        </p>
+      )}
+
+      <button
+        onClick={onRefresh}
+        disabled={loading}
+        className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium disabled:opacity-50"
+      >
+        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+        Verificar agora
+      </button>
+
+      {lastUpdated && (
+        <p className="text-xs text-gray-400">
+          Última verificação: {fmtTime(lastUpdated)} · verifica automaticamente a cada 5 min
+        </p>
+      )}
     </div>
   )
 }
